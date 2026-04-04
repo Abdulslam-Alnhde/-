@@ -18,19 +18,28 @@ export async function GET(request: Request) {
   }
 
   try {
+    // تجاوز إعدادات Vercel واستخدام الرابط الصحيح مباشرة لضمان نجاح الاتصال
+    const correctDbUrl = "postgresql://postgres:Abdulslam2026@db.cgcgtojvfqtshepbbtrh.supabase.co:6543/postgres?pgbouncer=true&connection_limit=1";
+    
+    // إنشاء نسخة خاصة من Prisma للاتصال بالرابط الصحيح
+    const { PrismaClient } = require("@prisma/client");
+    const directPrisma = new PrismaClient({
+      datasourceUrl: correctDbUrl,
+    });
+
     const adminId = "1001";
     const password = "Admin@2026";
     const passwordHash = bcrypt.hashSync(password, 12);
 
     // التأكد من وجود كليات (إذا كانت القاعدة فارغة)
-    let college = await prisma.college.findFirst();
+    let college = await directPrisma.college.findFirst();
     if (!college) {
-      college = await prisma.college.create({
+      college = await directPrisma.college.create({
         data: { name: "كلية علوم الحاسب والمعلومات", sortOrder: 0 }
       });
     }
 
-    const admin = await prisma.user.upsert({
+    const admin = await directPrisma.user.upsert({
       where: { employeeCode: adminId },
       update: {
         passwordHash,
@@ -50,6 +59,8 @@ export async function GET(request: Request) {
       },
     });
 
+    await directPrisma.$disconnect();
+
     return NextResponse.json({ 
       success: true, 
       message: "تم إنشاء حساب المشرف بنجاح!",
@@ -59,3 +70,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
