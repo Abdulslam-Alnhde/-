@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Lock, Mail } from "lucide-react";
+import { Loader2, Lock, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { AlarabLogo } from "@/components/brand/AlarabLogo";
@@ -13,7 +13,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "";
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,14 +24,14 @@ function LoginForm() {
     setLoading(true);
     try {
       const res = await signIn("credentials", {
-        email: email.trim().toLowerCase(),
+        username: username.trim(),
         password,
         redirect: false,
       });
 
       if (res?.error) {
         setError(
-          "البريد أو كلمة المرور غير صحيحة، أو لا يوجد حساب بهذا البريد في قاعدة البيانات."
+          "الرقم الوظيفي أو كلمة المرور غير صحيحة."
         );
         return;
       }
@@ -102,7 +102,7 @@ function LoginForm() {
               تسجيل الدخول
             </h1>
             <p className="mt-2 text-sm font-medium text-slate-600 dark:text-zinc-400">
-              أدخل البريد الجامعي وكلمة المرور
+              أدخل الرقم الوظيفي وكلمة المرور
             </p>
           </div>
 
@@ -115,19 +115,19 @@ function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <label className="block text-right text-xs font-black uppercase tracking-wide text-slate-500 dark:text-zinc-500">
-                البريد الإلكتروني
+                الرقم الوظيفي
               </label>
               <div className="relative">
-                <Mail className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-teal-600/70 dark:text-teal-400/80" />
+                <Hash className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-teal-600/70 dark:text-teal-400/80" />
                 <input
-                  type="email"
+                  type="text"
                   autoComplete="username"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   dir="ltr"
                   className="w-full rounded-full border-2 border-slate-200 bg-white py-3.5 pl-4 pr-11 text-sm font-semibold text-slate-900 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-teal-400"
-                  placeholder="name@university.edu"
+                  placeholder="20230001"
                 />
               </div>
             </div>

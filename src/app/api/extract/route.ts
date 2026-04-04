@@ -10,7 +10,7 @@ import { requireAuth } from "@/lib/auth-server";
 import { getQuestionDisplayLabel } from "@/lib/question-labels";
 import { round2 } from "@/lib/exam-keypoints-normalize";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import { aiManager } from "@/lib/ai-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -221,12 +221,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!process.env.GEMINI_API_KEY) {
+    if (aiManager.getAvailableKeysCount() === 0) {
       return NextResponse.json(
-        { error: "مفتاح API الخاص بـ Gemini غير مهيأ على الخادم." },
+        { error: "مفاتيح API الخاصة بـ Gemini غير مهيأة على الخادم." },
         { status: 500 }
       );
     }
+
+    const genAI = aiManager.getClient();
 
     const userTaskPrompt = `## المهمة
 حلّل الملفات المرفقة (ورقة الاختبار؛ قد يكون أكثر من ملفاً لأجزاء متتابعة).

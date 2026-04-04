@@ -8,7 +8,7 @@ import {
 } from "@/lib/gemini-helpers";
 import { requireAuth } from "@/lib/auth-server";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import { aiManager } from "@/lib/ai-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -49,9 +49,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "لم يتم العثور على ملف الطالب المرفوع" }, { status: 400 });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: "مفتاح API الخاص بـ Gemini مفقود" }, { status: 500 });
+    if (aiManager.getAvailableKeysCount() === 0) {
+      return NextResponse.json({ error: "مفاتيح API الخاصة بـ Gemini مفقودة" }, { status: 500 });
     }
+
+    const genAI = aiManager.getClient();
 
     const bytes = await file.arrayBuffer();
     const base64Data = Buffer.from(bytes).toString("base64");

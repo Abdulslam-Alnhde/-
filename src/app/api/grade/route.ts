@@ -19,7 +19,7 @@ import {
   setCachedGradingJson,
 } from "@/lib/grading-result-cache";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+import { aiManager } from "@/lib/ai-manager";
 const SEMANTIC_STRICT = process.env.GRADING_SEMANTIC_STRICT !== "false";
 
 /** طلبات تصحيح متزامنة لنفس المدخلات — نتيجة واحدة فقط (يقلّل تباين Gemini) */
@@ -268,6 +268,7 @@ async function runSemanticStrictRescue(params: {
 
   if (!candidates.length) return out;
 
+  const genAI = aiManager.getClient();
   const model = genAI.getGenerativeModel({
     model: modelName,
     generationConfig: {
@@ -453,7 +454,7 @@ export async function POST(req: NextRequest) {
   ]
 }
 `;
-
+    const genAI = aiManager.getClient();
     const MODELS = gradingModelsChain();
     const maxAttemptsPerModel = 3;
     let rawResponse = "";

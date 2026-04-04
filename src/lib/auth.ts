@@ -8,14 +8,14 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "credentials",
       credentials: {
-        email: { label: "البريد", type: "email" },
+        username: { label: "الرقم الوظيفي", type: "text" },
         password: { label: "كلمة المرور", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.username || !credentials?.password) return null;
 
-        const email = credentials.email.trim().toLowerCase();
-        const user = await prisma.user.findUnique({ where: { email } });
+        const employeeCode = credentials.username.trim();
+        const user = await prisma.user.findUnique({ where: { employeeCode } });
         if (!user?.passwordHash) return null;
 
         const ok = await verifyPassword(credentials.password, user.passwordHash);
