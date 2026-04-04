@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  TEACHER
+  COMMITTEE
+  ADMIN
+}
+
+enum ExamStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PUBLISHED
+}
+
+model College {
+  id        String @id @default(uuid())
+  name      String
+  sortOrder Int    @default(0)
+  users     User[]
+}
+
+enum SupportTicketStatus {
+  PENDING
+  ANSWERED
+}
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  /// كلمة المرور المشفّرة (bcrypt) — مطلوبة لتسجيل الدخول بالبريد
+  passwordHash  String?
+  role          Role     @default(TEACHER)
+  /// رقم وظيفي / تعريف الموظف — مطلوب عند إنشاء الحساب من لوحة الإدارة
+  employeeCode  String?  @unique
+  collegeId     String?
+  college       College? @relation(fields: [collegeId], references: [id])
+  nationalId    String?
+  phone         String?
+  department    String?
+  jobTitle      String?
+  hireDate      DateTime?
+  /// صلاحيات دقيقة (مفاتيح من lib/permissions)، المشرف يتجاوزها في المنطق
+  permissionKeys String[] @default([])
+  /// عند true: لا يعدّل المستخدم بياناته إلا بعد موافقة المشرف (أو عبر طلب تعديل)
+  profileLocked  Boolean  @default(true)
+  exams         Exam[]   @relation("TeacherExams")
+  notifications Notification[]
+  profileChangeRequests ProfileChangeRequest[]
+  supportTickets        SupportTicket[] @relation("UserSupportTickets")
+  supportRepliesAsAdmin SupportTicket[] @relation("AdminSupportReplies")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// طلب دعم فني — يرسله الموظف من الإعدادات، يجيب المشرف من لوحة الإدارة
+model SupportTicket {
+  id           String              @id @default(uuid())
+  userId       String
+  user         User                @relation("UserSupportTickets", fields: [userId], references: [id], onDelete: Cascade)
+  message      String
+  /// مسارات عامة للصور المرفقة، مثل ["/uploads/support/.../file.png"]
+  attachments  Json                @default("[]")
+  status       SupportTicketStatus @default(PENDING)
+  adminReply   String?
+  repliedAt    DateTime?
+  repliedById  String?
+  repliedBy    User?               @relation("AdminSupportReplies", fields: [repliedById], references: [id])
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+/// طلب تعديل بيانات الحساب من الموظف — يعتمد المشرف أو يرفض
+model ProfileChangeRequest {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payload      Json
+  status       String    @default("PENDING")
+  adminNote    String?
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  type      String?  // status_change, graded, alert
+  createdAt DateTime @default(now())
+}
+
+model Exam {
+  id                 String     @id @default(uuid())
+  title              String
+  description        String?
+  type               String?
+  totalGrade         Float?
+  referenceMaterials Json?      // Array of uploaded reference file paths/names
+  /// ملاحظة اللجنة عند الرفض (أو آخر ملاحظة مراجعة) — تُعرض للمعلم مع الاختبار
+  committeeFeedback  String?
+  status             ExamStatus @default(DRAFT)
+  teacherId          String
+  teacher            User       @relation("TeacherExams", fields: [teacherId], references: [id])
+  questions          Question[]
+  results            StudentResult[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model Question {
+  id            String   @id @default(uuid())
+  examId        String
+  exam          Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  type          String   // MCQ, ESSAY, TF, AI_EXTRACTED
+  content       String   // The question prompt
+  modelAnswer   String?  // The raw model answer extracted
+  options       Json?    // Array of string options for MCQ
+  correctAnswer String?  // The correct option
+  /// مجموع درجات المحاور الفرعية (قد يكون كسرياً مثل 7.5)
+  points        Float    @default(1)
+  /// عرض للمستخدم: مثل 3.1 أو 3.2 داخل السؤال الرئيسي 3
+  displayLabel  String?
+  /// تعليمات المعلم للتصحيح الآلي لهذا السؤال
+  teacherNote   String?
+  keyPoints     KeyPoint[]
+}
+
+model KeyPoint {
+  id          String   @id @default(uuid())
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  point       String   // The specific point required for marks
+  grade       Float    // Grade assigned to this point
+}
+
+model StudentResult {
+  id          String   @id @default(uuid())
+  examId      String
+  exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId   String   // Placeholder for student ID from a robust auth system
+  totalScore  Float
+  details     Json?    // Detailed breakdown of which KeyPoints were hit/missed
+  gradedAt    DateTime @default(now())
+}
