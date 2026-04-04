@@ -15,7 +15,15 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) return null;
 
         const email = credentials.email.trim().toLowerCase();
-        const user = await prisma.user.findUnique({ where: { email } });
+        
+        // استخدام اتصال مباشر لتجاوز أي أخطاء في إعدادات Vercel
+        const { PrismaClient } = require("@prisma/client");
+        const authPrisma = new PrismaClient({
+          datasourceUrl: "postgresql://postgres:Abdulslam2026@db.cgcgtojvfqtshepbbtrh.supabase.co:6543/postgres?pgbouncer=true&connection_limit=1",
+        });
+
+        const user = await authPrisma.user.findUnique({ where: { email } }).finally(() => authPrisma.$disconnect());
+        
         if (!user?.passwordHash) return null;
 
         const ok = await verifyPassword(credentials.password, user.passwordHash);
@@ -56,5 +64,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60,
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || "dev-only-change-me-use-long-random-string-in-production",
 };
