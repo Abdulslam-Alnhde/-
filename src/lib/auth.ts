@@ -12,14 +12,29 @@ export const authOptions: NextAuthOptions = {
         password: { label: "كلمة المرور", type: "password" },
       },
       async authorize(credentials) {
+        console.log("==== START LOGIN ATTEMPT ====");
+        console.log("Email provided:", credentials?.email);
         if (!credentials?.email || !credentials?.password) return null;
 
         const email = credentials.email.trim().toLowerCase();
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user?.passwordHash) return null;
+        
+        try {
+          console.log("Querying database for user...");
+          const user = await prisma.user.findUnique({ where: { email } });
+          console.log("User query result:", user ? `FOUND (id: ${user.id})` : "NOT FOUND");
+          
+          if (!user?.passwordHash) {
+            console.log("Login failed: No password hash for user.");
+            return null;
+          }
 
-        const ok = await verifyPassword(credentials.password, user.passwordHash);
-        if (!ok) return null;
+          console.log("Verifying password...");
+          const ok = await verifyPassword(credentials.password, user.passwordHash);
+          console.log("Password verification result:", ok);
+          
+          if (!ok) return null;
+          
+          console.log("==== LOGIN SUCCESS ====");
 
         return {
           id: user.id,
@@ -28,6 +43,10 @@ export const authOptions: NextAuthOptions = {
           role: user.role,
           permissionKeys: user.permissionKeys ?? [],
         };
+        } catch (error) {
+          console.error("AUTH ERROR CAUGHT:", error);
+          return null;
+        }
       },
     }),
   ],
