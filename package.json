@@ -14,6 +14,8 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.9.0",
+    "@neondatabase/serverless": "^1.0.2",
+    "@prisma/adapter-neon": "^7.6.0",
     "@prisma/client": "^5.12.1",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-avatar": "^1.0.4",
@@ -53,6 +55,7 @@
     "react-hook-form": "^7.51.3",
     "tailwind-merge": "^2.2.2",
     "tailwindcss-animate": "^1.0.7",
+    "ws": "^8.20.0",
     "zod": "^3.22.4",
     "zustand": "^4.5.2"
   },
@@ -62,6 +65,7 @@
     "@types/nodemailer": "^7.0.11",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^8",
     "eslint-config-next": "14.2.1",
