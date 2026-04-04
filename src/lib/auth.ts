@@ -15,15 +15,7 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) return null;
 
         const email = credentials.email.trim().toLowerCase();
-        
-        // استخدام اتصال مباشر لتجاوز أي أخطاء في إعدادات Vercel
-        const { PrismaClient } = require("@prisma/client");
-        const authPrisma = new PrismaClient({
-          datasourceUrl: "postgresql://postgres:Abdulslam2026@db.cgcgtojvfqtshepbbtrh.supabase.co:6543/postgres?pgbouncer=true&connection_limit=1",
-        });
-
-        const user = await authPrisma.user.findUnique({ where: { email } }).finally(() => authPrisma.$disconnect());
-        
+        const user = await prisma.user.findUnique({ where: { email } });
         if (!user?.passwordHash) return null;
 
         const ok = await verifyPassword(credentials.password, user.passwordHash);
