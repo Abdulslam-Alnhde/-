@@ -34,11 +34,9 @@ export default function AdminDashboard() {
     );
   }
 
-  const { metrics, roleDistribution, recentExams } = data || {
-    metrics: { totalUsers: 0, totalExams: 0, totalQuestions: 0, totalNotifications: 0 },
-    roleDistribution: [],
-    recentExams: []
-  };
+  const metrics = data?.metrics || { totalUsers: 0, totalExams: 0, totalQuestions: 0, totalNotifications: 0 };
+  const roleDistribution = data?.roleDistribution || [];
+  const recentExams = data?.recentExams || [];
 
   const statCards: {
     label: string;
