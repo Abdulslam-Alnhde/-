@@ -210,8 +210,8 @@ export function ExamUploadForm() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-5">
-        <div className="border-2 rounded-2xl p-5 shadow-sm bg-background flex flex-col hover:shadow-md transition-all">
-          <div className="w-full text-center border-b pb-4 mb-4">
+        <div className="rounded-3xl border bg-card p-6 shadow-sm flex flex-col hover:shadow-lg transition-all duration-300 dark:border-zinc-800 group">
+          <div className="w-full text-center border-b border-muted pb-4 mb-5">
             <h3 className="text-base font-black text-primary">ورقة الاختبار</h3>
             <p className="text-[10px] font-black text-muted-foreground mt-1 uppercase tracking-wider opacity-60">
               PDF أو صور — معاينة قبل الاستخراج
@@ -306,8 +306,8 @@ export function ExamUploadForm() {
           </label>
         </div>
 
-        <div className="border-2 rounded-2xl p-5 shadow-sm bg-background flex flex-col hover:shadow-md transition-all">
-          <div className="w-full text-center border-b pb-4 mb-4">
+        <div className="rounded-3xl border bg-card p-6 shadow-sm flex flex-col hover:shadow-lg transition-all duration-300 dark:border-zinc-800 group">
+          <div className="w-full text-center border-b border-muted pb-4 mb-5">
             <h3 className="text-base font-black text-indigo-500">الملازم المرجعية</h3>
             <p className="text-[10px] font-black text-muted-foreground mt-1 uppercase tracking-wider opacity-60">
               اختياري
@@ -390,7 +390,7 @@ export function ExamUploadForm() {
           </motion.div>
         )}
         <Button
-          className="w-full gap-3 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 h-12 text-base font-black rounded-xl shadow-lg shadow-indigo-500/25 active:scale-[0.99]"
+          className="w-full gap-3 bg-primary hover:bg-primary/90 text-primary-foreground h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all"
           onClick={handleExtraction}
           disabled={examFiles.length === 0 || isExtracting}
         >
