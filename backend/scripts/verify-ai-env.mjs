@@ -1,7 +1,6 @@
 /**
- * يتحقق من إعداد مزود API للذكاء الاصطناعي.
- * التشغيل: npm run verify-ai
- * أو: node scripts/verify-ai-env.mjs
+ * Validates AI env for the backend. Loads backend/.env
+ * Run: npm run verify-ai -w backend
  */
 import fs from "fs";
 import path from "path";
@@ -11,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.join(__dirname, "..", ".env");
 
 if (!fs.existsSync(envPath)) {
-  console.error("لا يوجد ملف .env في جذر المشروع:", envPath);
+  console.error("لا يوجد ملف .env في مجلد backend:", envPath);
   process.exit(1);
 }
 

@@ -1,0 +1,327 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Cairo + Inter يُحمّلان عبر next/font في layout.tsx */
+
+@layer base {
+  :root {
+    /* ── AlArab University Brand Colors ─────────────────────────────────
+       Teal  #00A99D  — primary actions, active states, accents
+       Orange #F26522 — highlights, warnings, pending states
+    ──────────────────────────────────────────────────────────────────── */
+
+    /* Page & layout */
+    --background: 180 5% 96%;              /* #F5F7F7 — main page bg */
+    --foreground: 0 0% 20%;                /* #333333 — primary text */
+
+    /* Cards & panels */
+    --card:            0 0% 100%;          /* #FFFFFF — pure white */
+    --card-foreground: 0 0% 20%;           /* #333333 — card text */
+
+    --popover:            0 0% 100%;
+    --popover-foreground: 0 0% 20%;
+
+    /* ── Brand Identity Tokens ──────────────────────────────────────── */
+    --brand-teal:        176 100% 33%;     /* #00A99D */
+    --brand-teal-dark:   176 100% 28%;     /* #008F84 — hover */
+    --brand-teal-light:  176  49% 94%;     /* #E8F7F6 */
+    --brand-orange:       20  89% 54%;     /* #F26522 */
+    --brand-orange-dark:  20  77% 44%;     /* #C4521A */
+    --brand-orange-light: 20  90% 95%;     /* #FEF0E8 */
+
+    /* ── Semantic Tokens ────────────────────────────────────────────── */
+    --primary:            176 100% 33%;    /* #00A99D */
+    --primary-foreground:   0   0% 100%;   /* white */
+
+    --secondary:            0   0%  96%;
+    --secondary-foreground:  0   0%  20%;
+
+    --muted:              180   5%  96%;
+    --muted-foreground:   180  14%  42%;   /* #6B8A89 */
+
+    --accent:             20  90%  95%;    /* #FEF0E8 — orange tint */
+    --accent-foreground:  20  77%  35%;
+
+    --destructive:         0  74%  50%;    /* #D32F2F */
+    --destructive-foreground: 0 0% 100%;
+
+    --border:             180 15%  90%;    /* #E2ECEC */
+    --input:              180 15%  90%;
+    --ring:             176 100%  33%;     /* brand-teal focus ring */
+
+    --radius: 0.75rem;
+
+    /* ── Sidebar gradient ───────────────────────────────────────────── */
+    --sidebar-gradient: linear-gradient(180deg, #003D38 0%, #005A54 100%);
+    --sidebar-bg:       176 100%  12%;     /* #003D38 */
+    --sidebar-active:   176 100%  33%;     /* #00A99D */
+
+    /* ── KPI backgrounds ────────────────────────────────────────────── */
+    --kpi-teal-bg:      176  49%  94%;     /* #E6F7F6 */
+    --kpi-orange-bg:     20  90%  95%;     /* #FFF3ED */
+  }
+
+  /* ── Dark Mode Variables ─────────────────────────────────────────── */
+  .dark {
+    --background: 180 27% 9%;              /* #0F1E1D */
+    --foreground: 178 20% 83%;             /* #C8DEDD */
+
+    --card: 180 27% 14%;                   /* #1A2E2D */
+    --card-foreground: 178 20% 83%;        /* #C8DEDD */
+
+    --popover: 180 27% 14%;
+    --popover-foreground: 178 20% 83%;
+
+    --brand-teal:        176 100% 39%;     /* #00C4B7 — brighter in dark */
+    --brand-teal-dark:   176 100% 33%;     /* #00A99D */
+    --brand-teal-light:  174  45%  9%;     /* #0D2422 */
+    --brand-orange:       20  89%  54%;    /* unchanged */
+    --brand-orange-dark:  20  77%  44%;
+    --brand-orange-light: 30  28%  13%;    /* #2A1F16 */
+
+    --primary:            176 100% 39%;    /* #00C4B7 */
+    --primary-foreground:   0   0% 100%;
+
+    --secondary:          180  24%  11%;   /* #162422 */
+    --secondary-foreground: 178 20%  83%;
+
+    --muted:              180  27%  14%;   /* #1A2E2D */
+    --muted-foreground:   178  14%  61%;   /* #8AADAB */
+
+    --accent:             180  24%  11%;
+    --accent-foreground:   20  89%  54%;
+
+    --destructive:          0  84%  62%;   /* #EF5350 */
+    --destructive-foreground: 0 0% 100%;
+
+    --border:             180  24%  16%;   /* #1E3330 */
+    --input:              180  24%  11%;   /* #162422 */
+    --ring:             176 100%  39%;
+
+    /* ── Sidebar gradient dark ──────────────────────────────────────── */
+    --sidebar-gradient: linear-gradient(180deg, #001A18 0%, #002E2A 100%);
+
+    /* ── KPI backgrounds dark ───────────────────────────────────────── */
+    --kpi-teal-bg: 174 45% 9%;             /* #0D2422 */
+    --kpi-orange-bg: 30 28% 13%;           /* #2A1F16 */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    color: #1A2E2D;
+  }
+  .dark h1,
+  .dark h2,
+  .dark h3,
+  .dark h4,
+  .dark h5,
+  .dark h6 {
+    color: #E8F4F3;
+  }
+}
+
+@layer utilities {
+  /* Fade in */
+  .animate-fade-in {
+    animation: fadeIn 0.35s ease-out both;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Slide in from right (RTL) */
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out both;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Pulse glow */
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.25);
+  }
+
+  /* Sidebar item */
+  .sidebar-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-200 cursor-pointer;
+    color: rgba(255, 255, 255, 0.70);
+  }
+  .sidebar-item:hover {
+    background: rgba(0, 169, 157, 0.2);
+    color: #FFFFFF;
+  }
+  .sidebar-item.active {
+    background: #00A99D;
+    color: #FFFFFF;
+    box-shadow: 0 4px 12px rgba(0, 169, 157, 0.30);
+  }
+
+  /* Landing hero chevron */
+  .landing-hero-chevron {
+    clip-path: polygon(
+      0 0, 100% 0,
+      100% calc(100% - 3.5rem),
+      50% 100%,
+      0 calc(100% - 3.5rem)
+    );
+  }
+  @media (min-width: 768px) {
+    .landing-hero-chevron {
+      clip-path: polygon(
+        0 0, 100% 0,
+        100% calc(100% - 4.5rem),
+        50% 100%,
+        0 calc(100% - 4.5rem)
+      );
+    }
+  }
+
+  /* ===== DESIGN SYSTEM TOKENS ===== */
+
+  .page-title {
+    @apply text-2xl font-bold tracking-tight leading-tight md:text-3xl;
+    color: #1A2E2D;
+  }
+  .dark .page-title { color: #E8F4F3; }
+
+  .page-subtitle {
+    @apply text-sm font-medium leading-relaxed;
+    color: #6B8A89;
+  }
+  .dark .page-subtitle { color: #8AADAB; }
+
+  .section-title {
+    @apply text-xl font-bold tracking-tight;
+    color: #1A2E2D;
+  }
+  .dark .section-title { color: #E8F4F3; }
+
+  .kpi-value {
+    @apply text-4xl font-bold tabular-nums tracking-tight leading-none;
+    color: #00A99D;
+  }
+  .dark .kpi-value { color: #00C4B7; }
+
+  .kpi-label {
+    @apply text-xs font-medium uppercase tracking-wide;
+    color: #666666;
+  }
+  .dark .kpi-label { color: #8AADAB; }
+
+  /* KPI card backgrounds */
+  .kpi-teal   { background: hsl(var(--kpi-teal-bg));   }
+  .kpi-orange { background: hsl(var(--kpi-orange-bg)); }
+
+  /* Standard dashboard card */
+  .dash-card {
+    background: #FFFFFF;
+    border: 1px solid #E2ECEC;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 169, 157, 0.08);
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+  .dash-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 169, 157, 0.12);
+    transform: translateY(-1px);
+  }
+  .dark .dash-card {
+    background: #1A2E2D;
+    border-color: #1E3D3A;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  }
+  .dark .dash-card:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Exam / item list card */
+  .list-card {
+    background: #FFFFFF;
+    border: 1px solid #E2ECEC;
+    @apply w-full rounded-xl p-4 text-right transition-all duration-150;
+  }
+  .list-card:hover {
+    border-color: #00A99D;
+    box-shadow: 0 2px 8px rgba(0, 169, 157, 0.08);
+  }
+  .dark .list-card {
+    background: #1A2E2D;
+    border-color: #1E3D3A;
+  }
+  .dark .list-card:hover {
+    border-color: #00A99D;
+  }
+
+  .page-content {
+    @apply space-y-8 pb-10;
+  }
+
+  .sidebar-section-label {
+    @apply mb-2 px-3 text-[10px] font-medium uppercase tracking-wider;
+    color: rgba(255,255,255,0.40);
+  }
+
+  /* ── Status Badge Tokens ─────────────────────────────────────────── */
+  .badge-pending {
+    background: #FFF3ED;
+    color: #F26522;
+    border: 1px solid #F26522;
+  }
+  .dark .badge-pending {
+    background: #2A1F16;
+    color: #F26522;
+    border-color: #F26522;
+  }
+
+  .badge-approved {
+    background: #E6F7F6;
+    color: #00A99D;
+    border: 1px solid #00A99D;
+  }
+  .dark .badge-approved {
+    background: #0D2422;
+    color: #00C4B7;
+    border-color: #00C4B7;
+  }
+
+  .badge-rejected {
+    background: #FFEBEB;
+    color: #D32F2F;
+    border: 1px solid #D32F2F;
+  }
+  .dark .badge-rejected {
+    background: #2A1616;
+    color: #EF5350;
+    border-color: #EF5350;
+  }
+
+  /* ── Table Tokens ────────────────────────────────────────────────── */
+  .table-header {
+    background: #EEF6F5;
+    color: #2A4A48;
+  }
+  .dark .table-header {
+    background: #162A28;
+    color: #A8C8C6;
+  }
+
+  .table-row-hover:hover {
+    background: #F5FFFE;
+  }
+  .dark .table-row-hover:hover {
+    background: #1E3530;
+  }
+}

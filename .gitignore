@@ -8,6 +8,8 @@ jspm_packages/
 # Next.js build output
 .next/
 out/
+frontend/.next/
+backend/dist/
 
 # Environment files
 .env
