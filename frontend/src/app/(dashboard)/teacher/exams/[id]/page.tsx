@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import axios from "axios";
 import { Loader2 } from "lucide-react";
-import { TeacherExamDetailView } from "@/components/exams/TeacherExamDetailView";
+import { TeacherExamDetailView } from "@/modules/exams/components/TeacherExamDetailView";
 
 export default function TeacherExamDetailPage() {
   const params = useParams();

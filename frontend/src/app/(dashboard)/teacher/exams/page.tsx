@@ -15,12 +15,12 @@ import {
   Plus,
   ArrowLeft,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/common/ui/button";
 import Link from "next/link";
-import { motion, AnimatePresence } from "@/lib/motion";
-import { TEACHER_LINKS, teacherExamDetailPath } from "@/lib/dashboard-links";
-import { formatExamTotalGradeAr } from "@/lib/exam-scoring";
-import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "@/common/lib/motion";
+import { TEACHER_LINKS, teacherExamDetailPath } from "@/common/lib/dashboard-links";
+import { formatExamTotalGradeAr } from "@/modules/exams/lib/exam-scoring";
+import { cn } from "@/common/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────────
    Types & constants

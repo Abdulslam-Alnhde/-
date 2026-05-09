@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/modules/auth/lib/auth";
 
 /**
  * مسارات المعلم لا تُعرض لغير دور TEACHER (حتى لو تعطّل الـ middleware).

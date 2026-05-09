@@ -10,7 +10,7 @@ import {
   Clock,
   User,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/common/ui/button";
 
 type Row = {
   id: string;

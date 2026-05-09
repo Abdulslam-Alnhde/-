@@ -327,7 +327,12 @@ async function runSemanticStrictRescue(params: {
 /** Grading pipeline; auth is enforced by the API gateway (BFF + internal secret). */
 export async function runGrading(req: Request): Promise<Response> {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as {
+      studentAnswers?: unknown;
+      keyPointsData?: unknown;
+      referenceMaterialsText?: unknown;
+      examTotalGrade?: unknown;
+    };
     const {
       studentAnswers,
       keyPointsData,
@@ -346,11 +351,18 @@ export async function runGrading(req: Request): Promise<Response> {
     const sortedKeyMeta = canonicalizeKeyPointsMeta(keyPointsData as unknown[]);
     const normalizedKeyPoints = normalizeBranchWeights(sortedKeyMeta);
 
+    const examTotalNum =
+      typeof examTotalGrade === "number" && Number.isFinite(examTotalGrade)
+        ? examTotalGrade
+        : undefined;
+    const refText =
+      typeof referenceMaterialsText === "string" ? referenceMaterialsText : "";
+
     const cachePayload = buildGradingCachePayload(
       sortedAnswers,
       normalizedKeyPoints,
-      examTotalGrade,
-      referenceMaterialsText
+      examTotalNum,
+      refText
     );
     const cacheKey = gradingCacheKey(cachePayload);
     const cached = getCachedGradingJson(cacheKey);
@@ -377,8 +389,8 @@ export async function runGrading(req: Request): Promise<Response> {
       const prompt = buildGradingPrompt({
         sortedAnswers,
         normalizedKeyPoints,
-        examTotalGrade,
-        referenceMaterialsText: referenceMaterialsText || "",
+        examTotalGrade: examTotalNum,
+        referenceMaterialsText: refText,
       });
 
       let lastError: unknown = null;
@@ -464,7 +476,7 @@ export async function runGrading(req: Request): Promise<Response> {
       const { breakdown: recBreak, totalScore: recTotal } = reconcileScores(
         rescuedBreakdown,
         normalizedKeyPoints,
-        examTotalGrade
+        examTotalNum
       );
 
       const responseBody = {

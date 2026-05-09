@@ -3,14 +3,14 @@
   "private": true,
   "workspaces": ["frontend", "backend"],
   "scripts": {
-    "dev": "concurrently -n web,api -c blue,magenta \"npm run dev -w frontend\" \"npm run dev -w backend\"",
-    "build": "npm run build -w backend && npm run build -w frontend",
-    "db:generate": "npm run db:generate -w backend",
-    "db:push": "npm run db:push -w backend",
-    "db:seed": "npm run db:seed -w backend",
-    "db:seed:force": "npm run db:seed:force -w backend",
-    "lint": "npm run lint -w frontend",
-    "verify-ai": "npm run verify-ai -w backend"
+    "dev": "concurrently -n web,api -c blue,magenta \"powershell -NoProfile -Command \\\"Set-Location frontend; npx --no-install next dev\\\"\" \"powershell -NoProfile -Command \\\"Set-Location backend; npm run dev\\\"\"",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "db:generate": "npm --prefix backend run db:generate",
+    "db:push": "npm --prefix backend run db:push",
+    "db:seed": "npm --prefix backend run db:seed",
+    "db:seed:force": "npm --prefix backend run db:seed:force",
+    "lint": "npm --prefix frontend run lint",
+    "verify-ai": "npm --prefix backend run verify-ai"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

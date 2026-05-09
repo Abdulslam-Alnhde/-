@@ -1,5 +1,3 @@
-import "server-only";
-
 import { AIProvider } from "../provider-interface";
 import { AIContentPart, AIRequestOptions, AIResponse } from "../types";
 import axios from "axios";
@@ -20,6 +18,23 @@ function summarizeAxiosError(err: unknown): string {
   const base = [status, statusText].filter(Boolean).join(" ");
   const detail = providerMsg || err.message || "";
   return [base, detail].filter(Boolean).join(" - ").trim();
+}
+
+function extractAssistantTextContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+
+  return content
+    .map((part) => {
+      if (typeof part === "string") return part;
+      if (part && typeof part === "object") {
+        const text = (part as { text?: unknown }).text;
+        if (typeof text === "string") return text;
+      }
+      return "";
+    })
+    .join("\n")
+    .trim();
 }
 
 export class OpenAIProvider implements AIProvider {
@@ -90,7 +105,8 @@ export class OpenAIProvider implements AIProvider {
     // xAI/Grok does not yet reliably support json_object mode, so it is excluded.
     const supportsJsonFormat =
       options.responseMimeType === "application/json" &&
-      this.name !== "xai";
+      this.name !== "xai" &&
+      this.name !== "ollama";
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
@@ -135,9 +151,29 @@ export class OpenAIProvider implements AIProvider {
     }
 
     const result = response.data;
-    const text = result?.choices?.[0]?.message?.content;
+    const text = extractAssistantTextContent(result?.choices?.[0]?.message?.content);
     if (typeof text !== "string" || !text.trim()) {
-      throw new Error(`${this.name || "provider"} returned an empty response.`);
+      const providerLabel = this.name || "provider";
+      const finishReason =
+        result?.choices?.[0]?.finish_reason ??
+        result?.choices?.[0]?.finishReason ??
+        "";
+      const choiceKeys =
+        result?.choices?.[0] && typeof result.choices[0] === "object"
+          ? Object.keys(result.choices[0]).slice(0, 12)
+          : [];
+      if (String(finishReason).toLowerCase() === "length") {
+        throw new Error(
+          `${providerLabel} response was truncated by the output token limit.` +
+            ` Increase maxTokens for this extraction flow.` +
+            (choiceKeys.length ? ` choice_keys=${choiceKeys.join(",")}.` : "")
+        );
+      }
+      throw new Error(
+        `${providerLabel} returned an empty response.` +
+          (finishReason ? ` finish_reason=${String(finishReason)}.` : "") +
+          (choiceKeys.length ? ` choice_keys=${choiceKeys.join(",")}.` : "")
+      );
     }
     return {
       text,

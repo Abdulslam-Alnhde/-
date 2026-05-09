@@ -1,6 +1,4 @@
-﻿import "server-only";
-
-import { aiManager } from "@/lib/ai-manager";
+﻿import { aiManager } from "@/lib/ai-manager";
 import { prepareFileForAI, type FilePreparationTrace } from "@/lib/ai-file-parts";
 import type { AIProvider } from "@/lib/ai/provider-interface";
 import type { AIResponse } from "@/lib/ai/types";
@@ -29,13 +27,23 @@ const STUDENT_BATCH_SIZE = Math.max(
   Math.min(6, Number(process.env.STUDENT_EXTRACT_BATCH_SIZE) || 2)
 );
 
+const STUDENT_BATCH_CONCURRENCY = Math.max(
+  1,
+  Math.min(4, Number(process.env.STUDENT_EXTRACT_BATCH_CONCURRENCY) || 2)
+);
+
+const STUDENT_RESCUE_CONCURRENCY = Math.max(
+  1,
+  Math.min(4, Number(process.env.STUDENT_RESCUE_CONCURRENCY) || 2)
+);
+
 const STUDENT_REQUEST_TIMEOUT_MS = Math.max(
   45000,
   Math.min(
     300000,
     Number(process.env.STUDENT_EXTRACT_TIMEOUT_MS) ||
       Number(process.env.AI_REQUEST_TIMEOUT_MS) ||
-      180000
+      300000
   )
 );
 
@@ -51,13 +59,18 @@ const STUDENT_MODEL_TIMEOUT_MS = Math.max(
   20000,
   Math.min(
     STUDENT_REQUEST_TIMEOUT_MS,
-    Number(process.env.STUDENT_MODEL_TIMEOUT_MS) || 90000
+    Number(process.env.STUDENT_MODEL_TIMEOUT_MS) || 120000
   )
 );
 
 const STUDENT_MODEL_RETRIES = Math.max(
   0,
   Math.min(2, Number(process.env.STUDENT_MODEL_RETRIES) || 1)
+);
+
+const STUDENT_LOCAL_MAX_TOKENS_FLOOR = Math.max(
+  1024,
+  Math.min(4096, Number(process.env.STUDENT_LOCAL_MAX_TOKENS_FLOOR) || 2048)
 );
 
 function resolveStudentModels(): string[] {
@@ -231,6 +244,17 @@ function toNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function normalizeQuestionLabel(value: unknown): string {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function resolveStudentMaxTokens(providerName: string): number {
+  if (providerName === "ollama" || providerName === "custom") {
+    return Math.max(STUDENT_MAX_TOKENS, STUDENT_LOCAL_MAX_TOKENS_FLOOR);
+  }
+  return STUDENT_MAX_TOKENS;
+}
+
 function isRetryableError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
@@ -238,6 +262,7 @@ function isRetryableError(error: unknown): boolean {
     isTransientNetworkError(error) ||
     lower.includes("timeout") ||
     lower.includes("timed out") ||
+    lower.includes("empty response") ||
     lower.includes("429") ||
     lower.includes("rate limit") ||
     lower.includes("503") ||
@@ -412,8 +437,23 @@ function normalizeSingleStudentPayload(raw: any, fallbackQuestionNumber: number)
   };
 }
 
-function normalizeStudentAnswerItem(raw: any) {
-  const questionNumber = toNumber(raw?.questionNumber ?? raw?.id ?? raw?.number);
+function resolveStudentQuestionNumber(
+  raw: any,
+  labelToId?: Map<string, number>
+): number | null {
+  const direct = toNumber(raw?.questionNumber ?? raw?.id ?? raw?.number);
+  if (direct != null && Number.isInteger(direct)) return direct;
+
+  const label = normalizeQuestionLabel(
+    raw?.questionLabel ?? raw?.displayLabel ?? raw?.label ?? raw?.questionNumber
+  );
+  if (label && labelToId?.has(label)) return labelToId.get(label) ?? null;
+
+  return direct;
+}
+
+function normalizeStudentAnswerItem(raw: any, labelToId?: Map<string, number>) {
+  const questionNumber = resolveStudentQuestionNumber(raw, labelToId);
   if (!questionNumber) return null;
 
   return {
@@ -423,7 +463,18 @@ function normalizeStudentAnswerItem(raw: any) {
   };
 }
 
-function normalizeStudentBatchPayload(data: any) {
+function normalizeStudentBatchPayload(
+  data: any,
+  questions?: Array<{ id: number; label?: string }>
+) {
+  const labelToId = new Map<string, number>();
+  for (const question of questions ?? []) {
+    const idLabel = normalizeQuestionLabel(question.id);
+    const displayLabel = normalizeQuestionLabel(question.label);
+    if (idLabel) labelToId.set(idLabel, question.id);
+    if (displayLabel) labelToId.set(displayLabel, question.id);
+  }
+
   const items = Array.isArray(data)
     ? data
     : Array.isArray(data?.answers)
@@ -433,7 +484,7 @@ function normalizeStudentBatchPayload(data: any) {
         : [];
 
   return items
-    .map((item: any) => normalizeStudentAnswerItem(item))
+    .map((item: any) => normalizeStudentAnswerItem(item, labelToId))
     .filter(
       (
         item: {
@@ -455,6 +506,41 @@ function splitIntoBatches<T>(items: T[], batchSize: number): T[][] {
     out.push(items.slice(i, i + batchSize));
   }
   return out;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  task: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await task(items[index], index);
+      }
+    })
+  );
+
+  return results;
+}
+
+function mergeStudentAnswer(
+  resultsMap: Map<
+    number,
+    { questionNumber: number; questionText: string; studentAnswer: string }
+  >,
+  item: { questionNumber: number; questionText: string; studentAnswer: string }
+) {
+  const existing = resultsMap.get(item.questionNumber);
+  if (!existing || (!existing.studentAnswer.trim() && item.studentAnswer.trim())) {
+    resultsMap.set(item.questionNumber, item);
+  }
 }
 
 export const buildSingleQuestionPrompt = buildStudentSinglePrompt;
@@ -552,7 +638,7 @@ async function callModelWithTimeout(params: {
         provider.generateContent([{ text: prompt }, ...fileParts], {
           model: modelName,
           temperature: 0,
-          maxTokens: STUDENT_MAX_TOKENS,
+          maxTokens: resolveStudentMaxTokens(provider.name),
           responseMimeType: "application/json",
         }),
         STUDENT_MODEL_TIMEOUT_MS,
@@ -756,11 +842,14 @@ export async function extractStudentAnswersInBatches(params: {
           modelCount: runtime.models.length,
           batchCount: batches.length,
           questionCount: questions.length,
+          concurrency: STUDENT_BATCH_CONCURRENCY,
         },
       });
 
-      for (let batchIndex = 0; batchIndex < batches.length; batchIndex += 1) {
-        const batch = batches[batchIndex];
+      const batchOutputs = await mapWithConcurrency(
+        batches,
+        STUDENT_BATCH_CONCURRENCY,
+        async (batch, batchIndex) => {
         const batchNumber = batchIndex + 1;
         const batchStart = Date.now();
         logger?.({
@@ -787,11 +876,7 @@ export async function extractStudentAnswersInBatches(params: {
               fileParts,
               logger,
             });
-            const normalized = normalizeStudentBatchPayload(raw);
-
-            for (const item of normalized) {
-              resultsMap.set(item.questionNumber, item);
-            }
+            const normalized = normalizeStudentBatchPayload(raw, batch);
 
             logger?.({
               stage: "batch.model.done",
@@ -805,7 +890,7 @@ export async function extractStudentAnswersInBatches(params: {
               },
             });
             batchSucceeded = true;
-            break;
+            return normalized;
           } catch (error) {
             batchError = error;
             lastError = error;
@@ -836,6 +921,15 @@ export async function extractStudentAnswersInBatches(params: {
             cause: batchError,
           });
         }
+
+        return [];
+        }
+      );
+
+      for (const normalized of batchOutputs) {
+        for (const item of normalized) {
+          mergeStudentAnswer(resultsMap, item);
+        }
       }
 
       const finalResults = questions.map((q) => {
@@ -865,7 +959,10 @@ export async function extractStudentAnswersInBatches(params: {
             },
           });
 
-          for (const row of missing) {
+          const rescuedRows = await mapWithConcurrency(
+            missing,
+            STUDENT_RESCUE_CONCURRENCY,
+            async (row) => {
             const q = questions.find((qq) => qq.id === row.questionNumber);
             const prompt = buildSingleQuestionPrompt({
               questionNumber: row.questionNumber,
@@ -898,11 +995,15 @@ export async function extractStudentAnswersInBatches(params: {
               }
             }
 
-            if (rescued?.studentAnswer?.trim()) {
-              resultsMap.set(rescued.questionNumber, rescued);
-              row.studentAnswer = rescued.studentAnswer;
-              row.questionText = row.questionText || rescued.questionText;
+            return { row, rescued };
             }
+          );
+
+          for (const { row, rescued } of rescuedRows) {
+            if (!rescued?.studentAnswer?.trim()) continue;
+            mergeStudentAnswer(resultsMap, rescued);
+            row.studentAnswer = rescued.studentAnswer;
+            row.questionText = row.questionText || rescued.questionText;
           }
 
           logger?.({

@@ -100,6 +100,16 @@ export const TEACHER_FILL_SYSTEM_INSTRUCTION =
 
 // ─── 2) Student answer extraction (handwriting OCR) ───────────────────
 
+// تعليمات خاصة باستخراج إجابات الطالب لضمان الدقة العالية
+export const STUDENT_EXTRACT_SYSTEM_INSTRUCTION = `You are a professional literal transcriber. Your goal is to extract student handwritten answers with 100% fidelity.
+
+STRICT RULES:
+1. VERBATIM ONLY: Transcribe exactly what is written. Do NOT improve grammar, do NOT summarize, and do NOT fix spelling.
+2. NO HALLUCINATION: If a word is illegible, write [?]. Do NOT guess based on context.
+3. PRESERVE STRUCTURE: Keep the sentences in the same order. If the student repeats a word, transcribe it twice.
+4. LANGUAGE: Keep Arabic in Arabic and English in English. Do NOT translate.
+5. NO COMMENTARY: Return ONLY the JSON object.`;
+
 export const STUDENT_VERBATIM_RULES = `
 LANGUAGE FIDELITY (mandatory):
 - Transcribe ONLY what appears on the paper for the student's answer.
@@ -134,44 +144,49 @@ export function buildStudentSinglePrompt(params: {
   questionLabel?: string;
 }): string {
   const { questionNumber, questionText, questionLabel } = params;
-  return `You are an expert OCR assistant.
-Find the student's answer for question "${questionLabel || questionNumber}".
-Question text: ${questionText || ""}
+  const resolvedQuestionText = questionText || "";
 
-Rules:
-${makeStudentExtractionRules()}
+  return `${STUDENT_EXTRACT_SYSTEM_INSTRUCTION}
 
-Return ONLY raw JSON:
-{"questionNumber": ${questionNumber}, "questionText": "string", "studentAnswer": "string"}`;
+TASK:
+Extract the student's answer for this specific question:
+Question Number: ${questionNumber} ${questionLabel ? `(${questionLabel})` : ""}
+Question Text: "${resolvedQuestionText}"
+
+REQUIRED JSON FORMAT:
+{
+  "questionNumber": ${questionNumber},
+  "questionText": "${resolvedQuestionText}",
+  "studentAnswer": "The literal transcription of the student's handwritten answer goes here. Be exhaustive and do not skip any sentences."
+}
+
+FINAL REMINDER: If the student wrote a long paragraph, you MUST transcribe every single word of it.`;
 }
 
 export function buildStudentBatchPrompt(
   batch: Array<{ id: number; label?: string; text?: string }>
 ): string {
-  return `You are an expert OCR assistant.
-Extract the student's answers for ONLY the listed questions from the uploaded answer sheet.
+  const questionsList = batch
+    .map((q) => `- Q${q.id}: ${q.text || "No text provided"}`)
+    .join("\n");
 
-Rules:
-${makeStudentExtractionRules()}
+  return `${STUDENT_EXTRACT_SYSTEM_INSTRUCTION}
 
-- Return answers only for the listed questions.
-- Never invent missing text.
-- If a question has no visible answer, return an empty string.
-- Keep questionNumber exactly as provided.
+TASK:
+Identify and transcribe the student's answers for the following ${batch.length} questions from the image:
+${questionsList}
 
-Questions in this batch:
-${JSON.stringify(
-  batch.map((q) => ({
-    questionNumber: q.id,
-    questionLabel: q.label || q.id,
-    questionText: q.text || "",
-  })),
-  null,
-  2
-)}
+REQUIRED JSON FORMAT:
+{
+  "answers": [
+    {
+      "questionNumber": "ID of the question",
+      "studentAnswer": "Literal, exhaustive transcription"
+    }
+  ]
+}
 
-Return ONLY raw JSON in this shape:
-{"answers":[{"questionNumber":1,"questionText":"string","studentAnswer":"string"}]}`;
+CRITICAL: If a question is answered on the paper but missing from your output, the system fails. Ensure every visible sentence is captured.`;
 }
 
 export function buildStudentJsonRepairPrompt(rawText: string): string {

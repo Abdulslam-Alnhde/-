@@ -1,8 +1,9 @@
 /** HTTP helpers mirroring previous NextResponse patterns. */
 import type { Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 export function jsonError(c: Context, message: string, status: number) {
-  return c.json({ error: message }, status);
+  return c.json({ error: message }, status as ContentfulStatusCode);
 }
 
 export function unauthorized(c: Context) {

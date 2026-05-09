@@ -1,7 +1,7 @@
 "use client";
 
-import { DashboardShell } from "@/components/shared/DashboardShell";
-import { AuthProvider } from "@/components/providers/auth-provider";
+import { DashboardShell } from "@/common/components/shared/DashboardShell";
+import { AuthProvider } from "@/modules/auth/providers/auth-provider";
 import { usePathname } from "next/navigation";
 
 export default function DashboardLayout({

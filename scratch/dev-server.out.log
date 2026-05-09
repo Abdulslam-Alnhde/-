@@ -1,0 +1,91 @@
+
+> university-exam-system@0.1.0 dev
+> npm run clean && next dev --port 3000
+
+
+> university-exam-system@0.1.0 clean
+> node -e "try{require('fs').rmSync('.next',{recursive:true,force:true});console.log('تم حذف .next');}catch(e){console.log(e.message)}"
+
+تم حذف .next
+  ▲ Next.js 14.2.1
+  - Local:        http://localhost:3000
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 4.8s
+ ○ Compiling / ...
+ ✓ Compiled / in 9.8s (658 modules)
+ GET / 200 in 10012ms
+ GET /login 200 in 10081ms
+ ✓ Compiled in 1661ms (334 modules)
+ ✓ Compiled in 465ms (334 modules)
+ ✓ Compiled in 258ms (334 modules)
+ ✓ Compiled in 299ms (334 modules)
+ ✓ Compiled in 251ms (334 modules)
+ ✓ Compiled in 352ms (334 modules)
+ ✓ Compiled in 271ms (334 modules)
+ ○ Compiling /api/extract-student ...
+ ✓ Compiled /api/extract-student in 3s (438 modules)
+[extract-student][fb326539-659b-4e43-a35b-8c28da04d3b5][request.start] Student extraction request received. {
+  requestId: 'fb326539-659b-4e43-a35b-8c28da04d3b5',
+  stage: 'request.start',
+  durationMs: undefined,
+  meta: { method: 'POST', url: '/api/extract-student' }
+}
+ POST /api/extract-student 401 in 3382ms
+ ✓ Compiled in 1308ms (334 modules)
+ ✓ Compiled in 272ms (334 modules)
+ ✓ Compiled in 253ms (334 modules)
+ ✓ Compiled in 208ms (334 modules)
+ ✓ Compiled in 331ms (334 modules)
+  ▲ Next.js 14.2.1
+  - Local:        http://localhost:3000
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 4.9s
+   Reload env: .env
+ ○ Compiling /api/extract-student ...
+ ✓ Compiled /api/extract-student in 1410ms (434 modules)
+[extract-student][2b72ceff-7cf9-4e52-bf93-2a93bd0186ac][request.start] Student extraction request received. {
+  requestId: '2b72ceff-7cf9-4e52-bf93-2a93bd0186ac',
+  stage: 'request.start',
+  durationMs: undefined,
+  meta: { method: 'POST', url: '/api/extract-student' }
+}
+ POST /api/extract-student 401 in 1777ms
+ ✓ Compiled in 54ms
+ ○ Compiling / ...
+ ✓ Compiled / in 2.3s (611 modules)
+ GET / 200 in 2492ms
+ ✓ Compiled in 322ms (312 modules)
+ ✓ Compiled in 292ms (312 modules)
+ ✓ Compiled in 227ms (312 modules)
+   Reload env: .env
+ ✓ Compiled in 180ms (298 modules)
+   Reload env: .env
+ ✓ Compiled in 80ms (298 modules)
+   Reload env: .env
+ ✓ Compiled in 75ms (298 modules)
+   Reload env: .env
+ ✓ Compiled in 123ms (298 modules)
+   Reload env: .env
+ ✓ Compiled in 121ms (298 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 4.3s (611 modules)
+ GET / 200 in 4660ms
+ ✓ Compiled /_not-found in 219ms (600 modules)
+ GET /_next/static/css/css-src_app_globals_css-node_modules_next_font_google_target_css.css?v=1776413707126 404 in 368ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 284ms
+ GET /_next/static/chunks/app/page.js 404 in 282ms
+ ✓ Compiled in 318ms (312 modules)
+ ✓ Compiled in 227ms (312 modules)
+ ✓ Compiled in 223ms (312 modules)
+ ✓ Compiled in 183ms (312 modules)
+ ✓ Compiled in 256ms (312 modules)
+ ✓ Compiled in 336ms (312 modules)
+   Reload env: .env
+ ✓ Compiled in 461ms (312 modules)
+   Reload env: .env
+ ✓ Compiled in 335ms (312 modules)
+[?25h

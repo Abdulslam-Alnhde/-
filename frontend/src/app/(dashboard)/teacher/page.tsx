@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GraduationCap, FileText, CheckCircle, Clock, Plus, AlertCircle, Loader2, ChevronRight, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { TEACHER_LINKS } from "@/lib/dashboard-links";
+import { Button } from "@/common/ui/button";
+import { TEACHER_LINKS } from "@/common/lib/dashboard-links";
 
 export default function TeacherDashboard() {
   const [exams, setExams] = useState<any[]>([]);

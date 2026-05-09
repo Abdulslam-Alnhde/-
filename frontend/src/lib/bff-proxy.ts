@@ -2,7 +2,7 @@
 import { getServerSession } from "next-auth";
 import type { Session } from "next-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/modules/auth/lib/auth";
 
 function backendBase() {
   return (process.env.INTERNAL_API_URL || "http://127.0.0.1:4000").replace(
@@ -52,8 +52,20 @@ export async function bffProxy(
   const headers = new Headers(init.headers);
   const extra = trustedHeadersFromSession(gate.session!);
   for (const [k, v] of Object.entries(extra)) headers.set(k, v as string);
-  const res = await fetch(url, { ...init, headers });
-  return bffToNextResponse(res);
+  try {
+    const res = await fetch(url, { ...init, headers });
+    return bffToNextResponse(res);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json(
+      {
+        error: "تعذر الاتصال بخادم الـ API الداخلي",
+        details: message,
+        url,
+      },
+      { status: 502 }
+    );
+  }
 }
 export function internalFetchOnly(
   apiPath: string,

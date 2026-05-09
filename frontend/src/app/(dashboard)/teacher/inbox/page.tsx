@@ -6,7 +6,7 @@ import {
   Inbox, Bell, CheckCircle, Clock, Trash2, 
   MessageSquare, AlertCircle, Loader2, Sparkles
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/common/ui/button";
 
 export default function TeacherInboxPage() {
   const [notifications, setNotifications] = useState<any[]>([]);

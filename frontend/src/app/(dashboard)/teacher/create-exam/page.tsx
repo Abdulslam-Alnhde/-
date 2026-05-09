@@ -1,13 +1,13 @@
 "use client";
 
 import { Suspense } from "react";
-import { useExamStore } from "@/store/useExamStore";
-import { motion, AnimatePresence } from "@/lib/motion";
+import { useExamStore } from "@/modules/exams/store/useExamStore";
+import { motion, AnimatePresence } from "@/common/lib/motion";
 import { Check, Info, FileUp, Sparkles, Loader2 } from "lucide-react";
-import { ExamBasicInfoForm } from "@/components/exams/ExamBasicInfoForm";
-import { ExamUploadForm } from "@/components/exams/ExamUploadForm";
-import { ExamReviewForm } from "@/components/exams/ExamReviewForm";
-import { CreateExamEditLoader } from "@/components/exams/CreateExamLoader";
+import { ExamBasicInfoForm } from "@/modules/exams/components/ExamBasicInfoForm";
+import { ExamUploadForm } from "@/modules/exams/components/ExamUploadForm";
+import { ExamReviewForm } from "@/modules/exams/components/ExamReviewForm";
+import { CreateExamEditLoader } from "@/modules/exams/components/CreateExamLoader";
 
 function CreateExamWizardInner() {
   const { step, setStep } = useExamStore();

@@ -3,17 +3,17 @@
 import dynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion } from "@/lib/motion";
+import { motion } from "@/common/lib/motion";
 const GradingResultsView = dynamic(
   () =>
-    import("@/components/exams/GradingResultsView").then(
+    import("@/modules/exams/components/GradingResultsView").then(
       (m) => m.GradingResultsView
     ),
   { ssr: false }
 );
 const ExtractionVerificationView = dynamic(
   () =>
-    import("@/components/exams/ExtractionVerificationView").then(
+    import("@/modules/exams/components/ExtractionVerificationView").then(
       (m) => m.ExtractionVerificationView
     ),
   { ssr: false }
@@ -34,12 +34,12 @@ import {
   Eye,
   Calculator,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useExamStore } from "@/store/useExamStore";
-import { hasPermission, PERMISSION_KEYS } from "@/lib/permissions";
-import { getQuestionDisplayLabel } from "@/lib/question-labels";
-import { formatScore2 } from "@/lib/score-format";
+import { Button } from "@/common/ui/button";
+import { Badge } from "@/common/ui/badge";
+import { useExamStore } from "@/modules/exams/store/useExamStore";
+import { hasPermission, PERMISSION_KEYS } from "@/common/lib/permissions";
+import { getQuestionDisplayLabel } from "@/modules/exams/lib/question-labels";
+import { formatScore2 } from "@/modules/exams/lib/score-format";
 
 type StepId = 1 | 2 | 3 | 4;
 

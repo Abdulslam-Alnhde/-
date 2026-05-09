@@ -1,5 +1,3 @@
-import "server-only";
-
 import type { AIContentPart } from "@/lib/ai/types";
 
 export type FilePreparationTrace = (event: {

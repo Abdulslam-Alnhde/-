@@ -1,5 +1,3 @@
-import "server-only";
-
 import axios from "axios";
 import { AIProvider } from "../provider-interface";
 import { AIContentPart, AIRequestOptions, AIResponse } from "../types";

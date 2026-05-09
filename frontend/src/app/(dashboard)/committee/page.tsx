@@ -6,9 +6,9 @@ import {
   BarChart3, Users, ExternalLink, AlertCircle, Loader2, ChevronLeft,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/common/ui/button";
 import Link from "next/link";
-import { COMMITTEE_LINKS } from "@/lib/dashboard-links";
+import { COMMITTEE_LINKS } from "@/common/lib/dashboard-links";
 
 type CommitteeStats = {
   pending: number;

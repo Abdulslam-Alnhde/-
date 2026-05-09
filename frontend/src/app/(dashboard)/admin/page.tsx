@@ -5,9 +5,9 @@ import {
   ShieldAlert, Settings, Users, FileText,
   Activity, Zap, Database, ArrowUpRight, Loader2
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/common/ui/button";
 import Link from "next/link";
-import { ADMIN_LINKS } from "@/lib/dashboard-links";
+import { ADMIN_LINKS } from "@/common/lib/dashboard-links";
 
 export default function AdminDashboard() {
   const [data, setData] = useState<any>(null);

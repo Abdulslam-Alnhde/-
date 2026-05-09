@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Cairo, Inter } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeProvider } from "@/common/providers/theme-provider";
 
 const cairo = Cairo({
   subsets: ["arabic", "latin"],

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { SettingsForm } from "@/components/shared/SettingsForm";
+import { SettingsForm } from "@/common/components/shared/SettingsForm";
 import { Loader2, ShieldCheck, Mail, User, Server, Database, Globe } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/common/ui/button";
 
 export default function AdminSettingsPage() {
   const [userData, setUserData] = useState<any>(null);

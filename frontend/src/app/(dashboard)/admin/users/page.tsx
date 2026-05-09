@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { motion, AnimatePresence } from "@/lib/motion";
+import { motion, AnimatePresence } from "@/common/lib/motion";
 import {
   Users,
   Search,
@@ -18,12 +18,12 @@ import {
   Building2,
   GraduationCap,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/common/ui/button";
 import {
   ADMIN_PANEL_PERMISSION_KEYS,
   COMMITTEE_PERMISSION_KEYS,
-} from "@/lib/permissions";
-import { canAdminPanelAction } from "@/lib/admin-user-actions";
+} from "@/common/lib/permissions";
+import { canAdminPanelAction } from "@/common/lib/admin-user-actions";
 
 type PermissionItem = { key: string; labelAr: string };
 

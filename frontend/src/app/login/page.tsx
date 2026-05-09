@@ -4,9 +4,9 @@ import { Suspense, useState } from "react";
 import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Lock, Mail } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/common/ui/button";
 import Link from "next/link";
-import { AlarabLogo } from "@/components/brand/AlarabLogo";
+import { AlarabLogo } from "@/common/components/brand/AlarabLogo";
 
 function LoginForm() {
   const router = useRouter();

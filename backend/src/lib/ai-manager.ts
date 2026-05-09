@@ -1,5 +1,3 @@
-import "server-only";
-
 import { AIFactory } from "./ai/factory";
 import { AIProvider } from "./ai/provider-interface";
 import {

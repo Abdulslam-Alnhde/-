@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { SettingsForm } from "@/components/shared/SettingsForm";
-import { SupportRequestPanel } from "@/components/shared/SupportRequestPanel";
+import { SettingsForm } from "@/common/components/shared/SettingsForm";
+import { SupportRequestPanel } from "@/common/components/shared/SupportRequestPanel";
 import { Loader2, ShieldCheck, Mail, User } from "lucide-react";
 
 export default function TeacherSettingsPage() {

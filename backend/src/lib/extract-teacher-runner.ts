@@ -837,19 +837,22 @@ async function fillMissingModelAnswers(params: {
     },
   ];
 
-  for (const file of referenceFiles) {
-    if (!(file instanceof File) || file.size <= 0) continue;
-    const fileParts = await prepareFileForAI(file, {
-      providerName: provider.name,
-      roleLabel: "Reference file",
-      maxPdfPages:
-        provider.name === "custom" || provider.name === "ollama"
-          ? CUSTOM_PROVIDER_MAX_PDF_PAGES
-          : undefined,
-      preferTextOnlyForPdf: false,
-    });
-    parts.push(...fileParts);
-  }
+  const referenceParts = await Promise.all(
+    referenceFiles
+      .filter((file) => file instanceof File && file.size > 0)
+      .map((file) =>
+        prepareFileForAI(file, {
+          providerName: provider.name,
+          roleLabel: "Reference file",
+          maxPdfPages:
+            provider.name === "custom" || provider.name === "ollama"
+              ? CUSTOM_PROVIDER_MAX_PDF_PAGES
+              : undefined,
+          preferTextOnlyForPdf: false,
+        })
+      )
+  );
+  parts.push(...referenceParts.flat());
 
   try {
     const result = await provider.generateContent(parts, {
@@ -1056,16 +1059,22 @@ export async function runTeacherExtraction(req: Request): Promise<Response> {
     const userTaskPrompt = buildTeacherUserTaskPrompt();
     const aiParts: any[] = [{ text: userTaskPrompt }];
 
-    for (const examFile of examFiles) {
-      const parts = await prepareFileForAI(examFile, {
-        providerName: provider.name,
-        roleLabel: "Exam file",
-        maxPdfPages:
-          provider.name === "custom" || provider.name === "ollama"
-            ? CUSTOM_PROVIDER_MAX_PDF_PAGES
-            : undefined,
-        preferTextOnlyForPdf: false,
-      });
+    const preparedExamFiles = await Promise.all(
+      examFiles.map(async (examFile) => {
+        const parts = await prepareFileForAI(examFile, {
+          providerName: provider.name,
+          roleLabel: "Exam file",
+          maxPdfPages:
+            provider.name === "custom" || provider.name === "ollama"
+              ? CUSTOM_PROVIDER_MAX_PDF_PAGES
+              : undefined,
+          preferTextOnlyForPdf: false,
+        });
+        return { examFile, parts };
+      })
+    );
+
+    for (const { examFile, parts } of preparedExamFiles) {
       console.log(
         `[extract-teacher] Prepared ${examFile.name} into ${parts.length} AI part(s) for ${provider.name}`
       );

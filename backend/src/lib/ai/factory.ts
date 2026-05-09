@@ -1,5 +1,3 @@
-import "server-only";
-
 import { AIProvider } from "./provider-interface";
 import { OpenAIProvider } from "./providers/openai-provider";
 import { XAIProvider } from "./providers/xai-provider";
