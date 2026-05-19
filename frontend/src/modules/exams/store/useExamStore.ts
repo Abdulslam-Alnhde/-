@@ -26,16 +26,51 @@ export interface ExamDetails {
   aiSuggestedTitle?: string;
 }
 
+/**
+ * الهيكل المُعلَن من المعلم قبل الرفع — يُمرَّر للـ AI كقالب متوقَّع
+ * (استخراج مُقيَّد) ويُستخدم للتحقق من نتيجة الاستخراج ومنع الهلوسة.
+ */
+export type ExamStructureQuestionType = "OBJECTIVE" | "RUBRIC";
+
+/** سؤال واحد مُعلَن: نوعه ودرجته وعدد تفرعاته */
+export type ExamStructureQuestion = {
+  type: ExamStructureQuestionType;
+  /** درجة السؤال الكاملة */
+  grade: number;
+  /** عدد التفرعات (الفقرات الفرعية) داخل هذا السؤال — 0 إن لم توجد */
+  subPartCount: number;
+};
+
+export type ExamStructure = {
+  /** عدد صفحات الاختبار */
+  pageCount: number;
+  /** قائمة الأسئلة المُعلَنة بالترتيب */
+  questions: ExamStructureQuestion[];
+};
+
+export const createEmptyStructureQuestion = (): ExamStructureQuestion => ({
+  type: "OBJECTIVE",
+  grade: 1,
+  subPartCount: 0,
+});
+
+export const createEmptyExamStructure = (): ExamStructure => ({
+  pageCount: 1,
+  questions: [],
+});
+
 interface ExamState {
   step: number;
   /** When set, finalize calls PATCH to resubmit a rejected exam */
   editingExamId: string | null;
   examDetails: ExamDetails;
+  examStructure: ExamStructure;
   extractedQuestions: ExtractedQuestion[];
   extractedStudentAnswers: any[];
   setStep: (step: number) => void;
   setEditingExamId: (id: string | null) => void;
   setExamDetails: (details: Partial<ExamDetails>) => void;
+  setExamStructure: (structure: Partial<ExamStructure>) => void;
   setExtractedQuestions: (questions: ExtractedQuestion[]) => void;
   setExtractedStudentAnswers: (answers: any[]) => void;
   updateStudentAnswer: (index: number, answer: string) => void;
@@ -64,14 +99,20 @@ export const useExamStore = create<ExamState>((set) => ({
     type: "MIDTERM",
     totalGrade: defaultTotalGradeForType("MIDTERM"),
   },
+  examStructure: createEmptyExamStructure(),
   extractedQuestions: [],
   extractedStudentAnswers: [],
 
   setStep: (step) => set({ step }),
   setEditingExamId: (id) => set({ editingExamId: id }),
-  
-  setExamDetails: (details) => 
+
+  setExamDetails: (details) =>
     set((state) => ({ examDetails: { ...state.examDetails, ...details } })),
+
+  setExamStructure: (structure) =>
+    set((state) => ({
+      examStructure: { ...state.examStructure, ...structure },
+    })),
     
   setExtractedQuestions: (questions) => 
     set({ extractedQuestions: questions }),
@@ -197,6 +238,7 @@ export const useExamStore = create<ExamState>((set) => ({
         type: "MIDTERM",
         totalGrade: defaultTotalGradeForType("MIDTERM"),
       },
+      examStructure: createEmptyExamStructure(),
       extractedQuestions: [],
       extractedStudentAnswers: [],
     }),

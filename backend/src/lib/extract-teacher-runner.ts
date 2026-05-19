@@ -25,7 +25,9 @@ import {
   buildTeacherBatchPrompt,
   buildTeacherFillMissingAnswersPrompt,
   buildTeacherJsonRepairPrompt,
+  buildTeacherStructureHint,
   buildTeacherUserTaskPrompt,
+  type TeacherExpectedStructure,
 } from "@/lib/ai-prompts";
 import { parsePossiblyWrappedJson } from "@/lib/safe-json";
 
@@ -146,6 +148,34 @@ const RUBRIC_PROMPT_PATTERNS = [
 ];
 
 // ─── Misc helpers ──────────────────────────────────────────────────────
+
+/** يقرأ الهيكل المتوقَّع المُعلَن من المعلم من حقل multipart اختياري. */
+function parseExpectedStructure(
+  raw: unknown
+): TeacherExpectedStructure | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? n : 0;
+    };
+    const rawQuestions = Array.isArray(parsed.questions)
+      ? parsed.questions
+      : [];
+    const questions = rawQuestions.map((q: any) => ({
+      type: q?.type === "RUBRIC" ? ("RUBRIC" as const) : ("OBJECTIVE" as const),
+      grade: num(q?.grade),
+      subPartCount: num(q?.subPartCount),
+    }));
+    return {
+      pageCount: num(parsed.pageCount),
+      questions,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function isTimeoutLikeError(error: unknown): boolean {
   const msg = String((error as { message?: string })?.message || error || "").toLowerCase();
@@ -845,7 +875,7 @@ async function fillMissingModelAnswers(params: {
           providerName: provider.name,
           roleLabel: "Reference file",
           maxPdfPages:
-            provider.name === "custom" || provider.name === "ollama"
+            provider.name === "custom"
               ? CUSTOM_PROVIDER_MAX_PDF_PAGES
               : undefined,
           preferTextOnlyForPdf: false,
@@ -1030,6 +1060,9 @@ export async function runTeacherExtraction(req: Request): Promise<Response> {
     const multi = formData.getAll("examFiles") as File[];
     const legacy = formData.get("examFile") as File | null;
     const referenceFiles = formData.getAll("referenceFiles") as File[];
+    const expectedStructure = parseExpectedStructure(
+      formData.get("expectedStructure")
+    );
 
     const examFiles: File[] = [];
     for (const f of multi) {
@@ -1056,7 +1089,13 @@ export async function runTeacherExtraction(req: Request): Promise<Response> {
     const providerModels = aiManager.getServiceModels(SERVICE);
     let lastError: unknown = null;
 
-    const userTaskPrompt = buildTeacherUserTaskPrompt();
+    const structureHint = buildTeacherStructureHint(expectedStructure);
+    if (structureHint) {
+      console.log(
+        "[extract-teacher] Using teacher-declared structure as extraction template"
+      );
+    }
+    const userTaskPrompt = buildTeacherUserTaskPrompt(structureHint);
     const aiParts: any[] = [{ text: userTaskPrompt }];
 
     const preparedExamFiles = await Promise.all(
@@ -1065,7 +1104,7 @@ export async function runTeacherExtraction(req: Request): Promise<Response> {
           providerName: provider.name,
           roleLabel: "Exam file",
           maxPdfPages:
-            provider.name === "custom" || provider.name === "ollama"
+            provider.name === "custom"
               ? CUSTOM_PROVIDER_MAX_PDF_PAGES
               : undefined,
           preferTextOnlyForPdf: false,

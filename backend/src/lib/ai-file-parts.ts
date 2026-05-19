@@ -15,11 +15,24 @@ type PdfParseCtor = new (options: {
 
 let PDFParseClass: PdfParseCtor | null = null;
 
-try {
-  const pdfParseModule = require("pdf-parse");
-  PDFParseClass = pdfParseModule.PDFParse ?? null;
-} catch {
-  console.warn("[ai-file-parts] pdf-parse not found; PDF text fallback disabled.");
+// pdf-parse lazy loader — uses dynamic import() for ESM compatibility.
+// Resolved on first call to extractPdfText().
+let _pdfParseLoadAttempted = false;
+async function ensurePdfParse(): Promise<PdfParseCtor | null> {
+  if (PDFParseClass || _pdfParseLoadAttempted) return PDFParseClass;
+  _pdfParseLoadAttempted = true;
+  try {
+    const mod = await import("pdf-parse");
+    PDFParseClass = (mod as any).PDFParse ?? (mod as any).default?.PDFParse ?? null;
+    if (PDFParseClass) {
+      console.log("[ai-file-parts] pdf-parse loaded successfully ✓");
+    } else {
+      console.warn("[ai-file-parts] pdf-parse module found but PDFParse class missing.");
+    }
+  } catch (err) {
+    console.warn("[ai-file-parts] pdf-parse not found; PDF text fallback disabled.", (err as Error).message);
+  }
+  return PDFParseClass;
 }
 
 const PDF_TEXT_MAX_CHARS = Math.max(
@@ -173,13 +186,14 @@ export async function extractPdfText(
   buffer: Buffer,
   trace?: FilePreparationTrace
 ): Promise<string> {
-  if (!PDFParseClass) return "";
+  const PdfCls = await ensurePdfParse();
+  if (!PdfCls) return "";
   trace?.({
     stage: "pdf.text.extract.start",
     message: "Extracting PDF text locally.",
     meta: { sizeBytes: buffer.length },
   });
-  const parser = new PDFParseClass({ data: new Uint8Array(buffer) });
+  const parser = new PdfCls({ data: new Uint8Array(buffer) });
   try {
     const data = await parser.getText();
     const text = normalizeExtractedTextForAI(String(data?.text || ""));

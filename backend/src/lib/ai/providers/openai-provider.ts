@@ -1,4 +1,4 @@
-import { AIProvider } from "../provider-interface";
+﻿import { AIProvider } from "../provider-interface";
 import { AIContentPart, AIRequestOptions, AIResponse } from "../types";
 import axios from "axios";
 
@@ -51,7 +51,7 @@ export class OpenAIProvider implements AIProvider {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
     this.name = name;
-    // استخراج PDF/صور قد يتجاوز 90ث؛ الافتراضي 5 دقائق (قابل للتعديل عبر AI_REQUEST_TIMEOUT_MS)
+    // Ø§Ø³ØªØ®Ø±Ø§Ø¬ PDF/ØµÙˆØ± Ù‚Ø¯ ÙŠØªØ¬Ø§ÙˆØ² 90Ø«Ø› Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ 5 Ø¯Ù‚Ø§Ø¦Ù‚ (Ù‚Ø§Ø¨Ù„ Ù„Ù„ØªØ¹Ø¯ÙŠÙ„ Ø¹Ø¨Ø± AI_REQUEST_TIMEOUT_MS)
     this.timeoutMs = Math.max(
       15000,
       Math.min(600000, Number(process.env.AI_REQUEST_TIMEOUT_MS) || 300000)
@@ -92,7 +92,7 @@ export class OpenAIProvider implements AIProvider {
       return { type: "text", text: p.text || "" };
     });
 
-    // Use plain string content for text-only messages — wider Ollama compatibility.
+    // Use plain string content for text-only messages â€” wider Gemini compatibility.
     const userContent: any = hasImages
       ? contentParts
       : contentParts.length === 1
@@ -101,12 +101,11 @@ export class OpenAIProvider implements AIProvider {
 
     messages.push({ role: "user", content: userContent });
 
-    // Enable JSON mode for OpenAI-compatible providers (cloud + local Ollama).
+    // Enable JSON mode for OpenAI-compatible providers (cloud + local Gemini).
     // xAI/Grok does not yet reliably support json_object mode, so it is excluded.
     const supportsJsonFormat =
       options.responseMimeType === "application/json" &&
-      this.name !== "xai" &&
-      this.name !== "ollama";
+      this.name !== "xai";
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
@@ -135,6 +134,17 @@ export class OpenAIProvider implements AIProvider {
       const status = axios.isAxiosError(err) ? err.response?.status : undefined;
       const summary = summarizeAxiosError(err);
       const providerLabel = this.name || "provider";
+
+      // Log full error body for 4xx errors to aid debugging.
+      if (axios.isAxiosError(err) && err.response?.data) {
+        console.error(
+          `[${providerLabel}] ${status} response body:`,
+          typeof err.response.data === "string"
+            ? err.response.data.slice(0, 1500)
+            : JSON.stringify(err.response.data).slice(0, 1500)
+        );
+      }
+
       if (status === 401 || status === 403) {
         throw new Error(`${providerLabel} auth error (${status}). ${summary}`);
       }

@@ -22,7 +22,73 @@ Rules:
 - The sum of defaultGrade inside one rubric question must equal questionMaxPoints when possible.
 - Do not add commentary, markdown, or prose outside JSON.`;
 
-export function buildTeacherUserTaskPrompt(): string {
+/**
+ * الهيكل المتوقَّع المُعلَن من المعلم قبل الرفع.
+ * يُحقَن في الـ prompt كقالب يلتزم به النموذج (استخراج مُقيَّد) لمنع الهلوسة.
+ */
+export type TeacherExpectedQuestion = {
+  type: "OBJECTIVE" | "RUBRIC";
+  grade: number;
+  subPartCount: number;
+};
+
+export type TeacherExpectedStructure = {
+  pageCount?: number;
+  questions?: TeacherExpectedQuestion[];
+};
+
+export function buildTeacherStructureHint(
+  structure: TeacherExpectedStructure | null | undefined
+): string {
+  if (!structure) return "";
+  const questions = Array.isArray(structure.questions)
+    ? structure.questions
+    : [];
+  if (questions.length === 0) return "";
+
+  const pages = Number(structure.pageCount) || 0;
+  const objective = questions.filter((q) => q.type === "OBJECTIVE").length;
+  const rubric = questions.filter((q) => q.type === "RUBRIC").length;
+  const subParts = questions.reduce(
+    (sum, q) => sum + (Number(q.subPartCount) || 0),
+    0
+  );
+
+  const perQuestion = questions
+    .map((q, i) => {
+      const type = q.type === "OBJECTIVE" ? "objective" : "rubric";
+      const grade = Number(q.grade) || 0;
+      const sub = Number(q.subPartCount) || 0;
+      const subNote =
+        sub > 0
+          ? ` → emit ${sub} JSON objects each with groupNumber=${i + 1} and subIndex=1..${sub}`
+          : ` → emit 1 JSON object with groupNumber=${i + 1}, subIndex=1`;
+      return `  Q${i + 1} (groupNumber=${i + 1}): ${type}, ${grade} mark(s), ${sub} sub-part(s)${subNote}`;
+    })
+    .join("\n");
+
+  return `EXPECTED EXAM STRUCTURE (declared by the teacher — treat it as a strict template):
+The exam paper has ${questions.length} MAIN questions printed in order.
+The first main question you encounter on the paper is Q1 (groupNumber=1),
+the second is Q2 (groupNumber=2), and so on.
+- Total pages: ${pages || "unknown"}.
+- Main questions: ${questions.length} (${objective} objective, ${rubric} rubric).
+- Total sub-parts across the whole exam: ${subParts}.
+
+Per-question mapping (follow this EXACTLY):
+${perQuestion}
+
+CRITICAL RULES:
+1. Each main question on the paper = a unique groupNumber (1, 2, 3 …).
+2. Sub-parts within a main question share the SAME groupNumber but have sequential subIndex values (1, 2, 3 …).
+3. You MUST produce exactly ${questions.length} distinct groupNumber values in your output.
+4. Scan ALL ${pages || ""} pages — do NOT stop after the first question.
+5. If your output does not have ${questions.length} distinct groupNumbers, re-read the paper from the beginning.
+6. Never invent questions. Never drop questions that are visibly present.`;
+}
+
+export function buildTeacherUserTaskPrompt(structureHint?: string): string {
+  const hint = structureHint ? `\n\n${structureHint}` : "";
   return `Extract the uploaded exam into JSON.
 
 Required JSON shape:
@@ -52,7 +118,7 @@ Important:
 - Read numbering exactly from the paper.
 - Never invent questions or answers not present in the uploaded exam file.
 - If a field is unknown, return an empty string instead of fabrication.
-- Return JSON only.`;
+- Return JSON only.${hint}`;
 }
 
 export function buildTeacherBatchPrompt(batchIndex: number, batchCount: number): string {

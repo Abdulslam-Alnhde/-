@@ -9,7 +9,6 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Loader2,
   GraduationCap,
   X,
   Plus,
@@ -21,6 +20,11 @@ import { motion, AnimatePresence } from "@/common/lib/motion";
 import { TEACHER_LINKS, teacherExamDetailPath } from "@/common/lib/dashboard-links";
 import { formatExamTotalGradeAr } from "@/modules/exams/lib/exam-scoring";
 import { cn } from "@/common/lib/utils";
+import { PageHeader } from "@/common/components/dashboard/PageHeader";
+import { SectionCard } from "@/common/components/dashboard/SectionCard";
+import { StatusBadge } from "@/common/components/dashboard/StatusBadge";
+import { PageLoading } from "@/common/components/dashboard/PageLoading";
+import { EmptyState } from "@/common/components/dashboard/EmptyState";
 
 /* ─────────────────────────────────────────────────────────────────
    Types & constants
@@ -30,96 +34,22 @@ type StatusKey = "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
 
 const VALID_STATUSES: StatusKey[] = ["PENDING_APPROVAL", "APPROVED", "REJECTED"];
 
-interface FilterDef {
-  key: StatusKey;
-  label: string;
-  icon: React.ElementType;
-  pillActive: string;
-  pillInactive: string;
-  countActive: string;
-  countInactive: string;
-}
-
-const FILTER_DEFS: FilterDef[] = [
-  {
-    key: "PENDING_APPROVAL",
-    label: "قيد المراجعة",
-    icon: Clock,
-    pillActive:
-      "border-brand-teal bg-brand-teal text-white shadow-lg shadow-brand-teal/20",
-    pillInactive:
-      "border-border bg-card text-muted-foreground hover:border-brand-teal/30 hover:text-brand-teal",
-    countActive: "bg-white/20 text-white",
-    countInactive: "bg-muted text-muted-foreground",
-  },
-  {
-    key: "APPROVED",
-    label: "معتمدة",
-    icon: CheckCircle2,
-    pillActive:
-      "border-brand-teal bg-brand-teal text-white shadow-lg shadow-brand-teal/20",
-    pillInactive:
-      "border-border bg-card text-muted-foreground hover:border-brand-teal/30 hover:text-brand-teal",
-    countActive: "bg-white/20 text-white",
-    countInactive: "bg-muted text-muted-foreground",
-  },
-  {
-    key: "REJECTED",
-    label: "مرفوضة",
-    icon: AlertCircle,
-    pillActive:
-      "border-brand-teal bg-brand-teal text-white shadow-lg shadow-brand-teal/20",
-    pillInactive:
-      "border-border bg-card text-muted-foreground hover:border-brand-teal/30 hover:text-brand-teal",
-    countActive: "bg-white/20 text-white",
-    countInactive: "bg-muted text-muted-foreground",
-  },
+const FILTER_DEFS: { key: StatusKey; label: string; icon: React.ElementType }[] = [
+  { key: "PENDING_APPROVAL", label: "قيد المراجعة", icon: Clock },
+  { key: "APPROVED", label: "معتمدة", icon: CheckCircle2 },
+  { key: "REJECTED", label: "مرفوضة", icon: AlertCircle },
 ];
 
 /* ─────────────────────────────────────────────────────────────────
    Helper sub-components
 ───────────────────────────────────────────────────────────────── */
 
-function TypeBadge({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function TypeBadge({ children }: { children: React.ReactNode }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-md border border-border bg-card/50 px-2 py-0.5 font-inter text-xs font-medium text-muted-foreground",
-        className
-      )}
-    >
+    <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 font-inter text-xs font-medium text-muted-foreground">
       {children}
     </span>
   );
-}
-
-function getStatusBadge(status: string) {
-  switch (status) {
-    case "APPROVED":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00A99D] bg-[#E6F7F6] px-3 py-1 text-xs font-medium text-[#00A99D] dark:bg-[#0D2422] dark:text-[#00C4B7] dark:border-[#00C4B7]">
-          <CheckCircle2 className="h-3 w-3" /> معتمد
-        </span>
-      );
-    case "PENDING_APPROVAL":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#F26522] bg-[#FFF3ED] px-3 py-1 text-xs font-medium text-[#F26522] dark:bg-[#2A1F16]">
-          <Clock className="h-3 w-3" /> قيد المراجعة
-        </span>
-      );
-    case "REJECTED":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D32F2F] bg-[#FFEBEB] px-3 py-1 text-xs font-medium text-[#D32F2F] dark:bg-[#2A1616] dark:text-[#EF5350] dark:border-[#EF5350]">
-          <AlertCircle className="h-3 w-3" /> مرفوض
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-          مسودة
-        </span>
-      );
-  }
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -129,15 +59,11 @@ function getStatusBadge(status: string) {
 function TeacherExamsContent() {
   const searchParams = useSearchParams();
 
-  /* ── Data ── */
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-
-  /* ── Multi-select filter state ── */
   const [activeStatuses, setActiveStatuses] = useState<StatusKey[]>([]);
 
-  /* Initialise from URL ?status= on first render / URL change */
   useEffect(() => {
     const urlStatus = searchParams.get("status") as StatusKey | null;
     if (urlStatus && VALID_STATUSES.includes(urlStatus)) {
@@ -155,7 +81,6 @@ function TeacherExamsContent() {
       .finally(() => setLoading(false));
   }, []);
 
-  /* ── Derived counts ── */
   const counts = useMemo(
     () => ({
       all: exams.length,
@@ -166,7 +91,6 @@ function TeacherExamsContent() {
     [exams]
   );
 
-  /* ── Filtered list ── */
   const filteredExams = useMemo(() => {
     return exams.filter((exam) => {
       const nameOk = exam.title
@@ -177,7 +101,6 @@ function TeacherExamsContent() {
     });
   }, [exams, searchQuery, activeStatuses]);
 
-  /* ── Toggle helpers ── */
   const toggleStatus = (key: StatusKey) => {
     setActiveStatuses((prev) =>
       prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key]
@@ -185,59 +108,47 @@ function TeacherExamsContent() {
   };
 
   const clearFilters = () => setActiveStatuses([]);
-
   const isAllActive = activeStatuses.length === 0;
 
   return (
-    <div className="min-h-[calc(100vh-6rem)] space-y-6 rounded-[2rem] bg-card p-4 font-cairo font-medium text-foreground animate-in fade-in duration-500 sm:p-6">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <PageHeader
+        eyebrow="الأستاذ"
+        title="مستودع الاختبارات"
+        subtitle="تابع جميع اختباراتك وحالتها في مكان واحد."
+        actions={
+          <Button
+            asChild
+            className="h-11 gap-2 rounded-xl bg-brand-teal px-5 font-bold text-white hover:bg-brand-teal/90"
+          >
+            <Link href={TEACHER_LINKS.createExam}>
+              <Plus className="h-4 w-4" />
+              إنشاء اختبار جديد
+            </Link>
+          </Button>
+        }
+      />
 
-      {/* ── Page title row ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-card text-brand-teal">
-            <FileText className="h-5 w-5" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">
-            مستودع الاختبارات
-          </h1>
-        </div>
-        <Button
-          asChild
-          className="h-11 gap-2 rounded-2xl bg-brand-teal px-5 font-bold text-white shadow-lg shadow-brand-teal/20 hover:bg-brand-teal/90"
-        >
-          <Link href={TEACHER_LINKS.createExam}>
-            <Plus className="h-4 w-4" />
-            إنشاء اختبار جديد
-          </Link>
-        </Button>
-      </div>
-
-      {/* ── Main repository card ── */}
-      <div className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-2xl shadow-black/15">
-
-        {/* Card header: title + search */}
-        <div className="flex flex-col gap-4 border-b border-border bg-card px-5 py-5 sm:flex-row sm:items-center sm:justify-between lg:px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-brand-teal">
-              <FileText className="h-4 w-4" />
-            </div>
-            <h2 className="text-base font-bold text-foreground">
-              الاختبارات
-            </h2>
-            {!loading && (
-              <span className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-bold tabular-nums text-brand-teal">
-                {filteredExams.length}
-              </span>
-            )}
-          </div>
-
-          {/* Search input */}
-          <div className="relative w-full sm:w-72">
+      <SectionCard
+        title="الاختبارات"
+        icon={FileText}
+        action={
+          !loading && (
+            <span className="rounded-full bg-brand-teal-light px-2.5 py-0.5 text-xs font-bold tabular-nums text-brand-teal-dark">
+              {filteredExams.length}
+            </span>
+          )
+        }
+      >
+        {/* Search + filters */}
+        <div className="space-y-4 border-b border-border px-6 py-5">
+          <div className="relative w-full sm:w-80">
             <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               aria-label="بحث"
-              className="w-full rounded-2xl border border-border bg-card py-2.5 pl-9 pr-9 text-sm font-medium text-foreground transition placeholder:text-muted-foreground focus:border-brand-teal/70 focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+              placeholder="ابحث باسم الاختبار..."
+              className="w-full rounded-xl border border-border bg-background py-2.5 pl-9 pr-9 text-sm font-medium text-foreground transition placeholder:text-muted-foreground focus:border-brand-teal/70 focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -251,109 +162,68 @@ function TeacherExamsContent() {
               </button>
             )}
           </div>
-        </div>
 
-        {/* Filter pills row */}
-        <div className="border-b border-border px-5 py-4 lg:px-6">
           <div className="flex flex-wrap items-center gap-2">
-            {/* "الكل" pill */}
-            <button
-              type="button"
+            <FilterPill
+              active={isAllActive}
+              icon={GraduationCap}
+              label="الكل"
+              count={loading ? undefined : counts.all}
               onClick={clearFilters}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-bold transition-all duration-150",
-                isAllActive
-                  ? "border-brand-teal bg-brand-teal text-white shadow-lg shadow-brand-teal/20"
-                  : "border-border bg-card text-muted-foreground hover:border-brand-teal/30 hover:text-brand-teal"
-              )}
-            >
-              <GraduationCap className="h-4 w-4 shrink-0" />
-              الكل
-              {!loading && (
-                <span
-                  className={cn(
-                    "rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums",
-                    isAllActive
-                      ? "bg-white/20 text-white"
-                      : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {counts.all}
-                </span>
-              )}
-            </button>
-
-            {/* Status pills — multi-selectable */}
-            {FILTER_DEFS.map((f) => {
-              const isActive = activeStatuses.includes(f.key);
-              const Icon = f.icon;
-              return (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => toggleStatus(f.key)}
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-bold transition-all duration-150",
-                    isActive ? f.pillActive : f.pillInactive
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {f.label}
-                  {!loading && (
-                    <span
-                      className={cn(
-                        "rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums",
-                        isActive ? f.countActive : f.countInactive
-                      )}
-                    >
-                      {counts[f.key]}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+            />
+            {FILTER_DEFS.map((f) => (
+              <FilterPill
+                key={f.key}
+                active={activeStatuses.includes(f.key)}
+                icon={f.icon}
+                label={f.label}
+                count={loading ? undefined : counts[f.key]}
+                onClick={() => toggleStatus(f.key)}
+              />
+            ))}
           </div>
         </div>
 
         {/* Table / states */}
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <Loader2 className="h-10 w-10 animate-spin text-brand-teal" />
-          </div>
+          <PageLoading message="جارِ تحميل الاختبارات..." />
         ) : filteredExams.length === 0 ? (
-          <div className="space-y-4 py-20 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-border bg-card text-muted-foreground">
-              <FileText className="h-7 w-7" />
-            </div>
-            <p className="font-bold text-muted-foreground">
-              لا توجد اختبارات
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              {activeStatuses.length > 0 && (
+          <EmptyState
+            icon={FileText}
+            title="لا توجد اختبارات"
+            description="لم نعثر على اختبارات مطابقة. جرّب تعديل البحث أو أنشئ اختباراً جديداً."
+            action={
+              <div className="flex items-center justify-center gap-3">
+                {activeStatuses.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl font-bold"
+                    onClick={clearFilters}
+                  >
+                    عرض الكل
+                  </Button>
+                )}
                 <Button
-                  variant="outline"
                   size="sm"
-                  className="rounded-xl border-border bg-card font-bold text-foreground hover:bg-muted hover:text-foreground"
-                  onClick={clearFilters}
+                  asChild
+                  className="rounded-xl bg-brand-teal font-bold text-white hover:bg-brand-teal/90"
                 >
-                  عرض الكل
+                  <Link href={TEACHER_LINKS.createExam}>إنشاء اختبار جديد</Link>
                 </Button>
-              )}
-              <Button size="sm" asChild className="rounded-xl bg-brand-teal font-bold text-white hover:bg-brand-teal/90">
-                <Link href={TEACHER_LINKS.createExam}>إنشاء اختبار جديد</Link>
-              </Button>
-            </div>
-          </div>
+              </div>
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-right">
               <thead>
-                <tr className="border-b border-[#EEEEEE] bg-[#F8F8F8] text-xs font-bold text-muted-foreground dark:border-[#1E3330] dark:bg-[#162A28] dark:text-[#A8C8C6]">
-                  <th className="px-6 py-4">تفاصيل الاختبار</th>
-                  <th className="px-6 py-4">الحالة</th>
-                  <th className="px-6 py-4">الأسئلة</th>
-                  <th className="px-6 py-4">الدرجة الكلية</th>
-                  <th className="px-6 py-4" />
+                <tr className="border-b border-border bg-muted/50 text-xs font-bold text-muted-foreground">
+                  <th className="px-6 py-3.5">تفاصيل الاختبار</th>
+                  <th className="px-6 py-3.5">الحالة</th>
+                  <th className="px-6 py-3.5">الأسئلة</th>
+                  <th className="px-6 py-3.5">الدرجة الكلية</th>
+                  <th className="px-6 py-3.5" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -364,12 +234,11 @@ function TeacherExamsContent() {
                       initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.15, delay: i * 0.04 }}
-                      className="group transition-colors hover:bg-[#F0FAFA] dark:hover:bg-[#1E3530]"
+                      className="group transition-colors hover:bg-brand-teal-light/40"
                     >
-                      {/* Exam details */}
                       <td className="px-6 py-4">
                         <div className="space-y-1.5">
-                          <p className="font-medium text-foreground transition-colors group-hover:text-brand-teal">
+                          <p className="font-bold text-foreground transition-colors group-hover:text-brand-teal">
                             {exam.title}
                           </p>
                           <div className="flex items-center gap-2">
@@ -379,8 +248,8 @@ function TeacherExamsContent() {
                             </span>
                           </div>
                           {exam.status === "REJECTED" && exam.committeeFeedback && (
-                            <p className="mt-1.5 max-w-xl rounded-xl border border-[#D32F2F]/20 bg-[#FFEBEB] px-3 py-2 text-xs font-medium leading-relaxed text-[#D32F2F] dark:bg-[#2A1616] dark:border-[#EF5350]/20 dark:text-[#EF5350]">
-                              <span className="text-[10px] font-bold uppercase tracking-wide text-[#D32F2F] dark:text-[#EF5350]">
+                            <p className="mt-1.5 max-w-xl rounded-xl border border-[#D32F2F]/20 bg-[#FFEBEB] px-3 py-2 text-xs font-medium leading-relaxed text-[#D32F2F]">
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-[#D32F2F]">
                                 ملاحظة اللجنة:{" "}
                               </span>
                               {exam.committeeFeedback}
@@ -389,10 +258,10 @@ function TeacherExamsContent() {
                         </div>
                       </td>
 
-                      {/* Status badge */}
-                      <td className="px-6 py-4">{getStatusBadge(exam.status)}</td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={exam.status} />
+                      </td>
 
-                      {/* Questions count */}
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-1.5 font-inter text-sm font-bold tabular-nums text-muted-foreground">
                           <FileText className="h-3.5 w-3.5 shrink-0" />
@@ -400,14 +269,12 @@ function TeacherExamsContent() {
                         </span>
                       </td>
 
-                      {/* Total grade */}
                       <td className="px-6 py-4">
                         <span className="font-inter text-sm font-bold tabular-nums text-brand-teal">
                           {formatExamTotalGradeAr(exam.totalGrade)}
                         </span>
                       </td>
 
-                      {/* Actions */}
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
                           {exam.status === "REJECTED" && (
@@ -415,7 +282,7 @@ function TeacherExamsContent() {
                               asChild
                               size="sm"
                               variant="secondary"
-                              className="h-8 rounded-xl border border-border bg-muted text-xs font-bold text-foreground hover:bg-muted/80"
+                              className="h-8 rounded-xl text-xs font-bold"
                             >
                               <Link
                                 href={`${TEACHER_LINKS.createExam}?edit=${encodeURIComponent(exam.id)}`}
@@ -428,7 +295,7 @@ function TeacherExamsContent() {
                             asChild
                             variant="outline"
                             size="sm"
-                            className="h-8 rounded-xl border-border bg-card text-xs font-bold text-foreground hover:border-brand-teal hover:bg-brand-teal hover:text-white"
+                            className="h-8 rounded-xl text-xs font-bold hover:border-brand-teal hover:bg-brand-teal hover:text-white"
                           >
                             <Link href={teacherExamDetailPath(exam.id)}>
                               تفاصيل <ArrowLeft className="mr-1 h-3 w-3" />
@@ -443,24 +310,55 @@ function TeacherExamsContent() {
             </table>
           </div>
         )}
-      </div>
+      </SectionCard>
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   Page export with Suspense boundary (required for useSearchParams)
-───────────────────────────────────────────────────────────────── */
+/* ── Filter pill ── */
+function FilterPill({
+  active,
+  icon: Icon,
+  label,
+  count,
+  onClick,
+}: {
+  active: boolean;
+  icon: React.ElementType;
+  label: string;
+  count?: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-bold transition-all duration-150",
+        active
+          ? "border-brand-teal bg-brand-teal text-white"
+          : "border-border bg-card text-muted-foreground hover:border-brand-teal/40 hover:text-brand-teal"
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      {label}
+      {count !== undefined && (
+        <span
+          className={cn(
+            "rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums",
+            active ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+          )}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
 
 export default function TeacherExamsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center rounded-[2rem] bg-card p-24">
-          <Loader2 className="h-12 w-12 animate-spin text-brand-teal" />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageLoading message="جارِ التحميل..." />}>
       <TeacherExamsContent />
     </Suspense>
   );

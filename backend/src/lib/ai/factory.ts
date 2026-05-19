@@ -6,17 +6,16 @@ import { AIProviderKind, AIServiceConfig } from "./types";
 const DEFAULT_BASE_URLS: Record<AIProviderKind, string | undefined> = {
   openai: "https://api.openai.com/v1",
   xai: "https://api.x.ai/v1",
-  ollama: "http://127.0.0.1:11434/v1",
   gemini: "https://generativelanguage.googleapis.com/v1beta/openai",
   custom: undefined,
 };
 
 function normalizeProvider(raw: string): AIProviderKind {
   const v = raw.trim().toLowerCase();
-  if (v === "openai" || v === "xai" || v === "ollama" || v === "gemini" || v === "custom") {
+  if (v === "openai" || v === "xai" || v === "gemini" || v === "custom") {
     return v;
   }
-  return "xai";
+  return "gemini";
 }
 
 function ensureProviderKey(params: {
@@ -25,9 +24,6 @@ function ensureProviderKey(params: {
   baseUrl?: string;
 }) {
   const { provider, apiKey, baseUrl } = params;
-
-  // Local Ollama doesn't require a real API key.
-  if (provider === "ollama") return;
 
   if (!apiKey) {
     if (provider === "xai") {
@@ -55,12 +51,6 @@ export class AIFactory {
           config.apiKey,
           baseUrl || "https://api.openai.com/v1",
           config.name || "openai"
-        );
-      case "ollama":
-        return new OpenAIProvider(
-          config.apiKey || "ollama",
-          baseUrl || "http://127.0.0.1:11434/v1",
-          config.name || "ollama"
         );
       case "gemini":
         return new OpenAIProvider(
@@ -100,7 +90,7 @@ export class AIFactory {
     const rawProvider = AIFactory.pickEnv(
       `${serviceEnvPrefix}_PROVIDER`,
       "AI_PROVIDER"
-    ) || "xai";
+    ) || "gemini";
     const provider = normalizeProvider(rawProvider);
 
     const apiKey = AIFactory.pickEnv(

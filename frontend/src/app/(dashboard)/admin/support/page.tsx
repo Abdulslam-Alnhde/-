@@ -11,6 +11,10 @@ import {
   User,
 } from "lucide-react";
 import { Button } from "@/common/ui/button";
+import { cn } from "@/common/lib/utils";
+import { PageHeader } from "@/common/components/dashboard/PageHeader";
+import { PageLoading } from "@/common/components/dashboard/PageLoading";
+import { EmptyState } from "@/common/components/dashboard/EmptyState";
 
 type Row = {
   id: string;
@@ -70,43 +74,46 @@ export default function AdminSupportPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          الدعم الفني
-        </h1>
-      </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <PageHeader
+        eyebrow="مدير النظام"
+        title="الدعم الفني"
+        subtitle="استقبل طلبات الموظفين وردّ عليها وتابع حالتها."
+      />
 
       {error && (
-        <p className="text-sm font-bold text-destructive" role="alert">
+        <p
+          className="rounded-xl bg-[#FFEBEB] px-4 py-3 text-sm font-bold text-[#D32F2F]"
+          role="alert"
+        >
           {error}
         </p>
       )}
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center gap-4 py-24">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-sm font-bold text-muted-foreground">جارِ التحميل…</p>
-        </div>
+        <PageLoading message="جارِ تحميل الطلبات…" />
       ) : rows.length === 0 ? (
-        <div className="rounded-2xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 px-6 py-16 text-center">
-          <Headphones className="mx-auto mb-3 h-10 w-10 text-muted-foreground opacity-50" />
-          <p className="text-sm font-bold text-muted-foreground">لا توجد طلبات حالياً.</p>
+        <div className="rounded-2xl bg-card ring-1 ring-border">
+          <EmptyState
+            icon={Headphones}
+            title="لا توجد طلبات حالياً"
+            description="ستظهر هنا طلبات الدعم الواردة من الأساتذة واللجان."
+          />
         </div>
       ) : (
         <ul className="space-y-6">
           {rows.map((t) => (
             <li
               key={t.id}
-              className="rounded-[1.5rem] border-2 border-border bg-card p-6 shadow-sm"
+              className="rounded-2xl bg-card p-6 ring-1 ring-border"
             >
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-teal-light text-brand-teal">
                     <User className="h-5 w-5" />
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-foreground">{t.user.name}</p>
+                    <p className="font-bold text-foreground">{t.user.name}</p>
                     <p className="text-xs text-muted-foreground" dir="ltr">
                       {t.user.email}
                     </p>
@@ -118,11 +125,12 @@ export default function AdminSupportPage() {
                 </div>
                 <div className="text-left sm:text-right">
                   <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold",
                       t.status === "ANSWERED"
-                        ? "bg-[#E6F7F6] text-[#00A99D] dark:bg-[#0D2422] dark:text-[#00C4B7]"
-                        : "bg-[#FFF3ED] text-[#F26522] dark:bg-[#2A1F16]"
-                    }`}
+                        ? "bg-brand-teal/10 text-brand-teal-dark"
+                        : "bg-brand-orange/10 text-brand-orange-dark"
+                    )}
                   >
                     {t.status === "ANSWERED" ? (
                       <CheckCircle2 className="h-3 w-3" />
@@ -131,7 +139,7 @@ export default function AdminSupportPage() {
                     )}
                     {t.status === "ANSWERED" ? "تم الرد" : "معلق"}
                   </span>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1.5 text-xs text-muted-foreground">
                     {new Date(t.createdAt).toLocaleString("ar-SA", {
                       dateStyle: "short",
                       timeStyle: "short",
@@ -140,7 +148,9 @@ export default function AdminSupportPage() {
                 </div>
               </div>
 
-              <p className="text-sm font-medium leading-relaxed">{t.message}</p>
+              <p className="text-sm font-medium leading-relaxed text-foreground">
+                {t.message}
+              </p>
 
               {Array.isArray(t.attachments) && t.attachments.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -150,7 +160,7 @@ export default function AdminSupportPage() {
                       href={src}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block overflow-hidden rounded-lg border"
+                      className="block overflow-hidden rounded-lg border border-border"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={src} alt="" className="h-24 w-24 object-cover" />
@@ -160,17 +170,19 @@ export default function AdminSupportPage() {
               )}
 
               {t.adminReply && (
-                <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
-                  <p className="text-xs font-medium text-primary">
+                <div className="mt-4 rounded-xl border border-brand-teal/20 bg-brand-teal-light/50 p-4">
+                  <p className="text-xs font-bold text-brand-teal-dark">
                     رد سابق
                     {t.repliedBy?.name ? ` — ${t.repliedBy.name}` : ""}
                   </p>
-                  <p className="mt-2 text-sm font-semibold">{t.adminReply}</p>
+                  <p className="mt-2 text-sm font-medium text-foreground">
+                    {t.adminReply}
+                  </p>
                 </div>
               )}
 
-              <div className="mt-4 space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">
+              <div className="mt-5 space-y-2">
+                <label className="text-xs font-bold text-muted-foreground">
                   {t.status === "ANSWERED" ? "تحديث الرد" : "الرد"}
                 </label>
                 <textarea
@@ -181,19 +193,21 @@ export default function AdminSupportPage() {
                   placeholder="اكتب ردك للموظف…"
                   rows={4}
                   maxLength={8000}
-                  className="w-full resize-y rounded-xl border-2 border-border bg-background px-3 py-2 text-sm font-semibold outline-none focus:border-primary focus:ring-2 ring-primary/20"
+                  className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-medium outline-none transition focus:border-brand-teal/70 focus:ring-2 focus:ring-brand-teal/20"
                 />
                 <Button
                   type="button"
                   onClick={() => sendReply(t.id)}
-                  disabled={savingId === t.id || !(replyDraft[t.id] || "").trim()}
-                  className="font-medium"
+                  disabled={
+                    savingId === t.id || !(replyDraft[t.id] || "").trim()
+                  }
+                  className="h-10 gap-1.5 rounded-xl bg-brand-teal font-bold text-white hover:bg-brand-teal/90"
                 >
                   {savingId === t.id ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <>
-                      <Send className="ms-1 h-4 w-4" />
+                      <Send className="h-4 w-4" />
                       إرسال الرد
                     </>
                   )}

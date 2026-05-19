@@ -1,5 +1,5 @@
-/**
- * Grading — Pipeline / Runner.
+﻿/**
+ * Grading â€” Pipeline / Runner.
  * Heavy logic for the /api/services/grading route lives here.
  * The route file is a thin wrapper that calls `runGrading`.
  */
@@ -33,7 +33,7 @@ import { parsePossiblyWrappedJson as parseJsonOrThrow } from "@/lib/safe-json";
 const SERVICE = "grading" as const;
 const SEMANTIC_STRICT = process.env.GRADING_SEMANTIC_STRICT !== "false";
 
-/** طلبات تصحيح متزامنة لنفس المدخلات — نتيجة واحدة فقط (يقلّل التباين) */
+/** Ø·Ù„Ø¨Ø§Øª ØªØµØ­ÙŠØ­ Ù…ØªØ²Ø§Ù…Ù†Ø© Ù„Ù†ÙØ³ Ø§Ù„Ù…Ø¯Ø®Ù„Ø§Øª â€” Ù†ØªÙŠØ¬Ø© ÙˆØ§Ø­Ø¯Ø© ÙÙ‚Ø· (ÙŠÙ‚Ù„Ù‘Ù„ Ø§Ù„ØªØ¨Ø§ÙŠÙ†) */
 const inflightGrading = new Map<string, Promise<unknown>>();
 
 class GradingHttpError extends Error {
@@ -71,7 +71,7 @@ function normalizeBranchWeights(keyPointsData: any[]): any[] {
         gradingMode: "single_branch",
         keyPoints: [
           {
-            point: "الإجابة الكاملة للسؤال (لا توجد فروع في النموذج)",
+            point: "Ø§Ù„Ø¥Ø¬Ø§Ø¨Ø© Ø§Ù„ÙƒØ§Ù…Ù„Ø© Ù„Ù„Ø³Ø¤Ø§Ù„ (Ù„Ø§ ØªÙˆØ¬Ø¯ ÙØ±ÙˆØ¹ ÙÙŠ Ø§Ù„Ù†Ù…ÙˆØ°Ø¬)",
             maxWeight: qMax,
             grade: qMax,
           },
@@ -228,16 +228,16 @@ function reconcileScores(
   return { breakdown: sorted, totalScore };
 }
 
-// ─── JSON parsing (uses shared safe-json) ──────────────────────────────
+// â”€â”€â”€ JSON parsing (uses shared safe-json) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function parsePossiblyWrappedJson(rawResponse: string): any {
   return parseJsonOrThrow(
     rawResponse,
-    "فشل في استخراج نتائج التصحيح بتنسيق JSON صحيح."
+    "ÙØ´Ù„ ÙÙŠ Ø§Ø³ØªØ®Ø±Ø§Ø¬ Ù†ØªØ§Ø¦Ø¬ Ø§Ù„ØªØµØ­ÙŠØ­ Ø¨ØªÙ†Ø³ÙŠÙ‚ JSON ØµØ­ÙŠØ­."
   );
 }
 
-// ─── Semantic strict rescue ────────────────────────────────────────────
+// â”€â”€â”€ Semantic strict rescue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function runSemanticStrictRescue(params: {
   modelName: string;
@@ -309,8 +309,8 @@ async function runSemanticStrictRescue(params: {
           return { ...kp, matched: true, earnedGrade: round2(Math.max(0, cap)) };
         });
       }
-      row.reasoningAr = `تحقق دلالي صارم: الإجابة صحيحة مفاهيمياً (${String(
-        parsed?.reasonAr ?? "مطابقة المعنى"
+      row.reasoningAr = `ØªØ­Ù‚Ù‚ Ø¯Ù„Ø§Ù„ÙŠ ØµØ§Ø±Ù…: Ø§Ù„Ø¥Ø¬Ø§Ø¨Ø© ØµØ­ÙŠØ­Ø© Ù…ÙØ§Ù‡ÙŠÙ…ÙŠØ§Ù‹ (${String(
+        parsed?.reasonAr ?? "Ù…Ø·Ø§Ø¨Ù‚Ø© Ø§Ù„Ù…Ø¹Ù†Ù‰"
       )}).`;
       row.reasoning = row.reasoningAr;
       out[c.i] = row;
@@ -322,7 +322,7 @@ async function runSemanticStrictRescue(params: {
   return out;
 }
 
-// ─── Public runner ─────────────────────────────────────────────────────
+// â”€â”€â”€ Public runner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Grading pipeline; auth is enforced by the API gateway (BFF + internal secret). */
 export async function runGrading(req: Request): Promise<Response> {
@@ -342,7 +342,7 @@ export async function runGrading(req: Request): Promise<Response> {
 
     if (!studentAnswers || !keyPointsData) {
       return Response.json(
-        { error: "بيانات التصحيح المطلوبة مفقودة" },
+        { error: "Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„ØªØµØ­ÙŠØ­ Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø© Ù…ÙÙ‚ÙˆØ¯Ø©" },
         { status: 400 }
       );
     }
@@ -377,12 +377,12 @@ export async function runGrading(req: Request): Promise<Response> {
     }
 
     const providerKind = aiManager.getServiceProviderKind(SERVICE);
-    const isLocalProvider = providerKind === "ollama" || providerKind === "custom";
+    const isLocalProvider = providerKind === "custom";
     const provider = aiManager.getServiceProvider(SERVICE);
     const MODELS = aiManager.getServiceModels(SERVICE);
 
     // Cloud providers: cap tokens to avoid cost/timeout issues.
-    // Local (Ollama): no cap — let the model finish without truncation.
+    // Custom providers may be local, so leave their token cap unset.
     const maxTokens = isLocalProvider ? undefined : 8192;
 
     const runGradingPipeline = async (): Promise<Record<string, unknown>> => {
@@ -431,10 +431,10 @@ export async function runGrading(req: Request): Promise<Response> {
         }
       }
 
-      // If local provider failed entirely, fall back to the global cloud provider.
+      // If a custom provider failed entirely, fall back to the global Gemini config.
       if (!rawResponse.trim() && isLocalProvider) {
         console.warn(
-          `[grading] Local provider (${providerKind}) unreachable or failed. Falling back to cloud provider.`
+          `[grading] Custom provider (${providerKind}) unreachable or failed. Falling back to Gemini.`
         );
         try {
           const cloudProvider = AIFactory.fromEnv();
@@ -442,7 +442,7 @@ export async function runGrading(req: Request): Promise<Response> {
             .split(",")
             .map((m) => m.trim())
             .filter(Boolean);
-          const cloudModel = cloudModels[0] || "grok-4-1-fast-non-reasoning";
+          const cloudModel = cloudModels[0] || "gemini-2.0-flash";
           const fallbackResult = await cloudProvider.generateContent(
             [{ text: prompt }],
             {
@@ -462,8 +462,8 @@ export async function runGrading(req: Request): Promise<Response> {
         console.error("Grading Error (all models):", lastError);
         throw new GradingHttpError(500, {
           error: isLocalProvider
-            ? "تعذّر الاتصال بـ Ollama. تأكد أن الخادم المحلي يعمل وأن النموذج gemma4:e4b محمّل، ثم أعد المحاولة."
-            : userFacingAIError(lastError ?? new Error("فشل التصحيح")),
+            ? "تعذر الاتصال بالمزود المخصص. تحقق من AI_BASE_URL و AI_API_KEY ثم أعد المحاولة."
+            : userFacingAIError(lastError ?? new Error("ÙØ´Ù„ Ø§Ù„ØªØµØ­ÙŠØ­")),
         });
       }
 
@@ -539,7 +539,7 @@ export async function runGrading(req: Request): Promise<Response> {
       (error instanceof Error && error.message?.includes("429"))
     ) {
       return Response.json(
-        { error: "الخدمة مزدحمة حالياً، يرجى الانتظار 30 ثانية والمحاولة مرة أخرى." },
+        { error: "Ø§Ù„Ø®Ø¯Ù…Ø© Ù…Ø²Ø¯Ø­Ù…Ø© Ø­Ø§Ù„ÙŠØ§Ù‹ØŒ ÙŠØ±Ø¬Ù‰ Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø± 30 Ø«Ø§Ù†ÙŠØ© ÙˆØ§Ù„Ù…Ø­Ø§ÙˆÙ„Ø© Ù…Ø±Ø© Ø£Ø®Ø±Ù‰." },
         { status: 429 }
       );
     }

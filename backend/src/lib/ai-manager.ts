@@ -1,4 +1,4 @@
-import { AIFactory } from "./ai/factory";
+﻿import { AIFactory } from "./ai/factory";
 import { AIProvider } from "./ai/provider-interface";
 import {
   AIContentPart,
@@ -11,16 +11,16 @@ import {
 } from "./ai-helpers";
 
 /**
- * مدير مزوّدات الذكاء الاصطناعي (Service-aware)
+ * Ù…Ø¯ÙŠØ± Ù…Ø²ÙˆÙ‘Ø¯Ø§Øª Ø§Ù„Ø°ÙƒØ§Ø¡ Ø§Ù„Ø§ØµØ·Ù†Ø§Ø¹ÙŠ (Service-aware)
  * ----------------------------------------------
- * يدعم ضبطاً مستقلاً لكل خدمة عبر متغيرات بيئة:
- *   - استخراج المعلم:   TEACHER_EXTRACTION_*
- *   - استخراج الطالب:  STUDENT_EXTRACTION_*
- *   - التصحيح:        GRADING_*
- * مع رجوع تلقائي إلى المتغيرات العامّة AI_* في غياب القيم الخاصّة.
+ * ÙŠØ¯Ø¹Ù… Ø¶Ø¨Ø·Ø§Ù‹ Ù…Ø³ØªÙ‚Ù„Ø§Ù‹ Ù„ÙƒÙ„ Ø®Ø¯Ù…Ø© Ø¹Ø¨Ø± Ù…ØªØºÙŠØ±Ø§Øª Ø¨ÙŠØ¦Ø©:
+ *   - Ø§Ø³ØªØ®Ø±Ø§Ø¬ Ø§Ù„Ù…Ø¹Ù„Ù…:   TEACHER_EXTRACTION_*
+ *   - Ø§Ø³ØªØ®Ø±Ø§Ø¬ Ø§Ù„Ø·Ø§Ù„Ø¨:  STUDENT_EXTRACTION_*
+ *   - Ø§Ù„ØªØµØ­ÙŠØ­:        GRADING_*
+ * Ù…Ø¹ Ø±Ø¬ÙˆØ¹ ØªÙ„Ù‚Ø§Ø¦ÙŠ Ø¥Ù„Ù‰ Ø§Ù„Ù…ØªØºÙŠØ±Ø§Øª Ø§Ù„Ø¹Ø§Ù…Ù‘Ø© AI_* ÙÙŠ ØºÙŠØ§Ø¨ Ø§Ù„Ù‚ÙŠÙ… Ø§Ù„Ø®Ø§ØµÙ‘Ø©.
  *
- * الميزة الإضافية: مفتاح موحّد للخدمتين (الاستخراج) عبر EXTRACTION_PROVIDER/_API_KEY/_BASE_URL/_MODELS
- * عند عدم تعريف المخصّص للخدمة.
+ * Ø§Ù„Ù…ÙŠØ²Ø© Ø§Ù„Ø¥Ø¶Ø§ÙÙŠØ©: Ù…ÙØªØ§Ø­ Ù…ÙˆØ­Ù‘Ø¯ Ù„Ù„Ø®Ø¯Ù…ØªÙŠÙ† (Ø§Ù„Ø§Ø³ØªØ®Ø±Ø§Ø¬) Ø¹Ø¨Ø± EXTRACTION_PROVIDER/_API_KEY/_BASE_URL/_MODELS
+ * Ø¹Ù†Ø¯ Ø¹Ø¯Ù… ØªØ¹Ø±ÙŠÙ Ø§Ù„Ù…Ø®ØµÙ‘Øµ Ù„Ù„Ø®Ø¯Ù…Ø©.
  */
 
 export type AIService =
@@ -35,17 +35,16 @@ const SERVICE_ENV_PREFIX: Record<AIService, string> = {
 };
 
 const SERVICE_FALLBACK_PREFIX: Record<AIService, string | undefined> = {
-  teacherExtraction: "EXTRACTION", // مفتاح موحّد لخدمتي الاستخراج
+  teacherExtraction: "EXTRACTION", // Ù…ÙØªØ§Ø­ Ù…ÙˆØ­Ù‘Ø¯ Ù„Ø®Ø¯Ù…ØªÙŠ Ø§Ù„Ø§Ø³ØªØ®Ø±Ø§Ø¬
   studentExtraction: "EXTRACTION",
   grading: undefined,
 };
 
 const DEFAULT_MODELS_BY_PROVIDER: Record<string, string[]> = {
-  ollama: ["gemma4:e4b"],
   gemini: ["gemini-2.0-flash"],
   openai: ["gpt-4o-mini"],
-  xai: ["grok-4-1-fast-non-reasoning"],
-  custom: ["gemma4:e4b"],
+  xai: ["gemini-2.0-flash"],
+  custom: ["gemini-2.0-flash"],
 };
 
 function pickEnv(...keys: string[]): string {
@@ -107,23 +106,25 @@ export class AIManager {
     return AIManager.instance;
   }
 
-  /** مزوّد عام (للتوافق مع كود قديم). */
+  /** Ù…Ø²ÙˆÙ‘Ø¯ Ø¹Ø§Ù… (Ù„Ù„ØªÙˆØ§ÙÙ‚ Ù…Ø¹ ÙƒÙˆØ¯ Ù‚Ø¯ÙŠÙ…). */
   public getProvider(): AIProvider {
     return AIFactory.fromEnv();
   }
 
-  /** سلسلة المزوّدات العامّة (للتوافق مع كود قديم). */
+  /** Ø³Ù„Ø³Ù„Ø© Ø§Ù„Ù…Ø²ÙˆÙ‘Ø¯Ø§Øª Ø§Ù„Ø¹Ø§Ù…Ù‘Ø© (Ù„Ù„ØªÙˆØ§ÙÙ‚ Ù…Ø¹ ÙƒÙˆØ¯ Ù‚Ø¯ÙŠÙ…). */
   public getProviderChain(): AIProvider[] {
     return [AIFactory.fromEnv()];
   }
 
   public getAvailableKeysCount(): number {
-    const key = String(process.env.XAI_API_KEY || process.env.AI_API_KEY || "").trim();
+    const key = String(
+      process.env.GEMINI_API_KEY || process.env.XAI_API_KEY || process.env.AI_API_KEY || ""
+    ).trim();
     return key ? 1 : 0;
   }
 
-  /** يختار المزوّد الخاصّ بخدمة (مع رجوع لمزوّد مشترك أو لـ AI_* العامّ).
-   * التصحيح يعمل افتراضياً على نموذج محلي (Ollama) إن لم يُحدّد له مزوّد. */
+  /** ÙŠØ®ØªØ§Ø± Ø§Ù„Ù…Ø²ÙˆÙ‘Ø¯ Ø§Ù„Ø®Ø§ØµÙ‘ Ø¨Ø®Ø¯Ù…Ø© (Ù…Ø¹ Ø±Ø¬ÙˆØ¹ Ù„Ù…Ø²ÙˆÙ‘Ø¯ Ù…Ø´ØªØ±Ùƒ Ø£Ùˆ Ù„Ù€ AI_* Ø§Ù„Ø¹Ø§Ù…Ù‘).
+   * Ø§Ù„ØªØµØ­ÙŠØ­ ÙŠØ¹Ù…Ù„ Ø§ÙØªØ±Ø§Ø¶ÙŠØ§Ù‹ Ø¹Ù„Ù‰ Ù†Ù…ÙˆØ°Ø¬ Ù…Ø­Ù„ÙŠ (Gemini) Ø¥Ù† Ù„Ù… ÙŠÙØ­Ø¯Ù‘Ø¯ Ù„Ù‡ Ù…Ø²ÙˆÙ‘Ø¯. */
   public getServiceProvider(service: AIService): AIProvider {
     const envPrefix = SERVICE_ENV_PREFIX[service];
     const fallbackPrefix = SERVICE_FALLBACK_PREFIX[service];
@@ -133,23 +134,10 @@ export class AIManager {
       tryConfigForServiceEnv(fallbackPrefix)?.provider;
     if (explicit) return explicit;
 
-    if (service === "grading") {
-      try {
-        return AIFactory.createProvider({
-          provider: "ollama",
-          apiKey: pickEnv("OLLAMA_API_KEY") || "ollama",
-          baseUrl: pickEnv("OLLAMA_BASE_URL") || "http://127.0.0.1:11434/v1",
-          name: "ollama",
-        });
-      } catch {
-        // fall through to global config
-      }
-    }
-
     return AIFactory.fromEnv();
   }
 
-  /** سلسلة النماذج لخدمة معيّنة. */
+  /** Ø³Ù„Ø³Ù„Ø© Ø§Ù„Ù†Ù…Ø§Ø°Ø¬ Ù„Ø®Ø¯Ù…Ø© Ù…Ø¹ÙŠÙ‘Ù†Ø©. */
   public getServiceModels(service: AIService): string[] {
     const envPrefix = SERVICE_ENV_PREFIX[service];
     const fallbackPrefix = SERVICE_FALLBACK_PREFIX[service];
@@ -167,12 +155,12 @@ export class AIManager {
     const globalModels = parseModelList(process.env.AI_MODELS);
     if (globalModels.length > 0) return globalModels;
 
-    // افتراضات مبنية على نوع المزوّد
+    // Ø§ÙØªØ±Ø§Ø¶Ø§Øª Ù…Ø¨Ù†ÙŠØ© Ø¹Ù„Ù‰ Ù†ÙˆØ¹ Ø§Ù„Ù…Ø²ÙˆÙ‘Ø¯
     const provider = this.getServiceProviderKind(service);
-    return DEFAULT_MODELS_BY_PROVIDER[provider] || ["grok-4-1-fast-non-reasoning"];
+    return DEFAULT_MODELS_BY_PROVIDER[provider] || ["gemini-2.0-flash"];
   }
 
-  /** نوع المزوّد المختار للخدمة (للأغراض التشخيصية والافتراضات). */
+  /** Ù†ÙˆØ¹ Ø§Ù„Ù…Ø²ÙˆÙ‘Ø¯ Ø§Ù„Ù…Ø®ØªØ§Ø± Ù„Ù„Ø®Ø¯Ù…Ø© (Ù„Ù„Ø£ØºØ±Ø§Ø¶ Ø§Ù„ØªØ´Ø®ÙŠØµÙŠØ© ÙˆØ§Ù„Ø§ÙØªØ±Ø§Ø¶Ø§Øª). */
   public getServiceProviderKind(service: AIService): string {
     const envPrefix = SERVICE_ENV_PREFIX[service];
     const fallbackPrefix = SERVICE_FALLBACK_PREFIX[service];
@@ -181,16 +169,14 @@ export class AIManager {
       (fallbackPrefix ? pickEnv(`${fallbackPrefix}_PROVIDER`) : "");
     if (explicit) return explicit.toLowerCase();
 
-    // التصحيح ⇒ محلي افتراضياً
-    if (service === "grading") return "ollama";
-
-    return (pickEnv("AI_PROVIDER") || "xai").toLowerCase();
+    // Ø§Ù„ØªØµØ­ÙŠØ­ â‡’ Ù…Ø­Ù„ÙŠ Ø§ÙØªØ±Ø§Ø¶ÙŠØ§Ù‹
+    return (pickEnv("AI_PROVIDER") || "gemini").toLowerCase();
   }
 
   /**
-   * توليد محتوى موحّد لخدمة معيّنة مع تجربة سلسلة النماذج.
-   * يستخدمه أي مسار يحتاج استدعاءً مباشراً وبسيطاً.
-   * المسارات الأكثر تعقيداً (دفعات/إنقاذ) تستطيع استدعاء `getServiceProvider` مباشرةً.
+   * ØªÙˆÙ„ÙŠØ¯ Ù…Ø­ØªÙˆÙ‰ Ù…ÙˆØ­Ù‘Ø¯ Ù„Ø®Ø¯Ù…Ø© Ù…Ø¹ÙŠÙ‘Ù†Ø© Ù…Ø¹ ØªØ¬Ø±Ø¨Ø© Ø³Ù„Ø³Ù„Ø© Ø§Ù„Ù†Ù…Ø§Ø°Ø¬.
+   * ÙŠØ³ØªØ®Ø¯Ù…Ù‡ Ø£ÙŠ Ù…Ø³Ø§Ø± ÙŠØ­ØªØ§Ø¬ Ø§Ø³ØªØ¯Ø¹Ø§Ø¡Ù‹ Ù…Ø¨Ø§Ø´Ø±Ø§Ù‹ ÙˆØ¨Ø³ÙŠØ·Ø§Ù‹.
+   * Ø§Ù„Ù…Ø³Ø§Ø±Ø§Øª Ø§Ù„Ø£ÙƒØ«Ø± ØªØ¹Ù‚ÙŠØ¯Ø§Ù‹ (Ø¯ÙØ¹Ø§Øª/Ø¥Ù†Ù‚Ø§Ø°) ØªØ³ØªØ·ÙŠØ¹ Ø§Ø³ØªØ¯Ø¹Ø§Ø¡ `getServiceProvider` Ù…Ø¨Ø§Ø´Ø±Ø©Ù‹.
    */
   public async generateContent(params: {
     service: AIService;
@@ -225,7 +211,7 @@ export class AIManager {
           const msg = err instanceof Error ? err.message : String(err);
           const lower = msg.toLowerCase();
 
-          // Hard failures → switch to next model immediately.
+          // Hard failures â†’ switch to next model immediately.
           if (
             lower.includes("429") ||
             lower.includes("503") ||

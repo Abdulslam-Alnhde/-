@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/common/ui/button";
 import { Badge } from "@/common/ui/badge";
+import { PageHeader } from "@/common/components/dashboard/PageHeader";
+import { PageLoading } from "@/common/components/dashboard/PageLoading";
 import { useExamStore } from "@/modules/exams/store/useExamStore";
 import { hasPermission, PERMISSION_KEYS } from "@/common/lib/permissions";
 import { getQuestionDisplayLabel } from "@/modules/exams/lib/question-labels";
@@ -498,16 +500,13 @@ function CommitteeQueuePageContent() {
   ];
 
   return (
-    <div className="page-content">
+    <div className="page-content space-y-8">
       {/* Page header */}
-      <header className="mb-8 space-y-3 text-right">
-        <h1 className="page-title text-foreground">
-          قائمة المراجعة والتقييم
-        </h1>
-        <p className="page-subtitle max-w-2xl">
-          راجع الطلبات المعلقة، ثم ارفع ورقة الطالب، راجع الاستخراج، شغّل التصحيح، ثم اعتماد أو رفض النموذج.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="لجنة المراجعة"
+        title="قائمة المراجعة والتقييم"
+        subtitle="راجع الطلبات المعلقة، ثم ارفع ورقة الطالب، راجع الاستخراج، شغّل التصحيح، ثم اعتماد أو رفض النموذج."
+      />
 
       <div className="grid grid-cols-1 gap-7 lg:grid-cols-12 lg:items-start">
         {/* قائمة الطلبات — على اليمين في RTL */}
@@ -983,16 +982,7 @@ function CommitteeQueuePageContent() {
 
 export default function CommitteeQueuePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col items-center justify-center gap-4 p-24">
-          <Loader2 className="h-12 w-12 animate-spin text-brand-teal" />
-          <p className="text-sm font-bold text-muted-foreground">
-            جارٍ تحميل قائمة المراجعة…
-          </p>
-        </div>
-      }
-    >
+    <Suspense fallback={<PageLoading message="جارٍ تحميل قائمة المراجعة…" />}>
       <CommitteeQueuePageContent />
     </Suspense>
   );

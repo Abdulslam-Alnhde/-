@@ -249,7 +249,7 @@ function normalizeQuestionLabel(value: unknown): string {
 }
 
 function resolveStudentMaxTokens(providerName: string): number {
-  if (providerName === "ollama" || providerName === "custom") {
+  if (providerName === "custom") {
     return Math.max(STUDENT_MAX_TOKENS, STUDENT_LOCAL_MAX_TOKENS_FLOOR);
   }
   return STUDENT_MAX_TOKENS;

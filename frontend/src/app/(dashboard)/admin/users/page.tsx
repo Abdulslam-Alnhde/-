@@ -24,6 +24,9 @@ import {
   COMMITTEE_PERMISSION_KEYS,
 } from "@/common/lib/permissions";
 import { canAdminPanelAction } from "@/common/lib/admin-user-actions";
+import { PageHeader } from "@/common/components/dashboard/PageHeader";
+import { PageLoading } from "@/common/components/dashboard/PageLoading";
+import { EmptyState } from "@/common/components/dashboard/EmptyState";
 
 type PermissionItem = { key: string; labelAr: string };
 
@@ -431,34 +434,34 @@ export default function AdminUsersPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col space-y-8 animate-in fade-in duration-700">
-      <div className="flex shrink-0 flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            المستخدمون
-          </h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={tab === "users" ? "default" : "outline"}
-            onClick={() => setTab("users")}
-            className="gap-2 rounded-xl font-medium shadow-sm"
-          >
-            <Users className="h-4 w-4" /> المستخدمون
-          </Button>
-          <Button
-            variant={tab === "requests" ? "default" : "outline"}
-            onClick={() => setTab("requests")}
-            className="gap-2 rounded-xl font-medium"
-          >
-            <ClipboardList className="h-4 w-4" /> طلبات التعديل
-            {pendingCount > 0 && (
-              <span className="mr-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px]">
-                {pendingCount}
-              </span>
-            )}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="مدير النظام"
+        title="إدارة المستخدمين"
+        subtitle="أضف الحسابات وعدّل الأدوار والصلاحيات وراجع طلبات التعديل."
+        actions={
+          <>
+            <Button
+              variant={tab === "users" ? "default" : "outline"}
+              onClick={() => setTab("users")}
+              className="h-11 gap-2 rounded-xl font-bold"
+            >
+              <Users className="h-4 w-4" /> المستخدمون
+            </Button>
+            <Button
+              variant={tab === "requests" ? "default" : "outline"}
+              onClick={() => setTab("requests")}
+              className="h-11 gap-2 rounded-xl font-bold"
+            >
+              <ClipboardList className="h-4 w-4" /> طلبات التعديل
+              {pendingCount > 0 && (
+                <span className="mr-1 rounded-full bg-brand-orange px-2 py-0.5 text-[10px] font-bold text-white">
+                  {pendingCount}
+                </span>
+              )}
+            </Button>
+          </>
+        }
+      />
 
       {tab === "users" && (
         <>
@@ -469,7 +472,7 @@ export default function AdminUsersPage() {
                   setNewUser(emptyForm());
                   setIsAdding(true);
                 }}
-                className="h-10 w-fit gap-2 rounded-xl bg-brand-teal px-5 font-medium shadow-md shadow-brand-teal/20 hover:bg-brand-teal/90"
+                className="h-11 w-fit gap-2 rounded-xl bg-brand-teal px-5 font-bold text-white hover:bg-brand-teal/90"
               >
                 <UserPlus className="h-4 w-4" /> إضافة مستخدم
               </Button>
@@ -481,32 +484,29 @@ export default function AdminUsersPage() {
                 placeholder="بحث بالاسم أو البريد أو الرقم الوظيفي…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-2xl border-2 border-border bg-white py-3 pl-4 pr-10 text-sm font-medium shadow-sm transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 dark:bg-[#162422] dark:text-[#C8DEDD]"
+                className="w-full rounded-xl border border-border bg-background py-2.5 pl-4 pr-10 text-sm font-medium transition focus:border-brand-teal/70 focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
               />
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border bg-white shadow-xl shadow-border/40 dark:bg-card">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card ring-1 ring-border">
             <div className="min-h-0 flex-1 overflow-auto">
               {loading ? (
-                <div className="flex flex-col items-center justify-center gap-4 p-24">
-                  <Loader2 className="h-12 w-12 animate-spin text-brand-teal" />
-                  <p className="text-sm font-bold text-muted-foreground">
-                    جارِ جلب البيانات…
-                  </p>
-                </div>
+                <PageLoading message="جارِ جلب البيانات…" />
               ) : !canList ? (
                 <div className="p-16 text-center text-sm font-bold text-brand-orange">
                   ليس لديك صلاحية عرض قائمة المستخدمين.
                 </div>
               ) : filteredUsers.length === 0 ? (
-                <div className="p-24 text-center text-sm font-medium text-muted-foreground">
-                  لا توجد حسابات.
-                </div>
+                <EmptyState
+                  icon={Users}
+                  title="لا توجد حسابات"
+                  description="لم نعثر على مستخدمين مطابقين لبحثك."
+                />
               ) : (
                 <table className="w-full min-w-[720px] text-right">
-                  <thead className="sticky top-0 z-10 border-b border-[#EEEEEE] bg-[#F8F8F8] dark:border-[#1E3330] dark:bg-[#162A28]">
-                    <tr className="text-xs font-medium text-muted-foreground">
+                  <thead className="sticky top-0 z-10 border-b border-border bg-muted/50">
+                    <tr className="text-xs font-bold text-muted-foreground">
                       <th className="px-5 py-4">المستخدم</th>
                       <th className="px-5 py-4">الكلية</th>
                       <th className="px-5 py-4">الدور</th>
@@ -523,7 +523,7 @@ export default function AdminUsersPage() {
                           initial={{ opacity: 0, y: 4 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.02 }}
-                          className="group hover:bg-[#F0FAFA] transition-colors dark:hover:bg-[#1E3530]"
+                          className="group hover:bg-brand-teal-light/40 transition-colors"
                         >
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
@@ -632,15 +632,15 @@ export default function AdminUsersPage() {
       )}
 
       {tab === "requests" && (
-        <div className="rounded-3xl border border-border bg-white p-6 shadow-lg dark:bg-card">
+        <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
           {reqLoading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-10 w-10 animate-spin text-brand-teal" />
-            </div>
+            <PageLoading message="جارِ تحميل الطلبات…" />
           ) : requests.length === 0 ? (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              لا توجد طلبات.
-            </p>
+            <EmptyState
+              icon={ClipboardList}
+              title="لا توجد طلبات"
+              description="لم يتقدّم أي مستخدم بطلب تعديل ملف حتى الآن."
+            />
           ) : (
             <div className="space-y-4">
               {requests.map((r) => (

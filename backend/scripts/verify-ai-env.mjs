@@ -1,6 +1,6 @@
 /**
- * Validates AI env for the backend. Loads backend/.env
- * Run: npm run verify-ai -w backend
+ * Validates AI env for the backend. Loads backend/.env.
+ * Run: npm --prefix backend run verify-ai
  */
 import fs from "fs";
 import path from "path";
@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.join(__dirname, "..", ".env");
 
 if (!fs.existsSync(envPath)) {
-  console.error("لا يوجد ملف .env في مجلد backend:", envPath);
+  console.error("No .env file found in backend:", envPath);
   process.exit(1);
 }
 
@@ -31,32 +31,47 @@ for (const line of raw.split(/\r?\n/)) {
   process.env[key] = val;
 }
 
-const provider = (process.env.AI_PROVIDER || "xai").trim();
-const aiApiKey = process.env.AI_API_KEY?.trim();
-const xaiApiKey = process.env.XAI_API_KEY?.trim();
-const baseUrl = process.env.AI_BASE_URL?.trim();
+const provider = (process.env.AI_PROVIDER || "gemini").trim();
+const serviceProviders = [
+  process.env.EXTRACTION_PROVIDER,
+  process.env.TEACHER_EXTRACTION_PROVIDER,
+  process.env.STUDENT_EXTRACTION_PROVIDER,
+  process.env.GRADING_PROVIDER,
+]
+  .filter(Boolean)
+  .map((v) => String(v).trim());
 
-if (provider === "xai") {
-  if (!xaiApiKey && !aiApiKey) {
-    console.error("ضع XAI_API_KEY أو AI_API_KEY لاستخدام xAI (Grok).");
-    process.exit(1);
-  }
-  console.log("xAI (Grok): تم العثور على مفتاح API.");
-} else if (provider === "openai") {
-  if (!aiApiKey) {
-    console.error("ضع AI_API_KEY لاستخدام OpenAI.");
-    process.exit(1);
-  }
-  console.log("OpenAI: تم العثور على مفتاح API.");
-} else if (provider === "custom") {
-  if (!aiApiKey || !baseUrl) {
-    console.error("ضع AI_API_KEY و AI_BASE_URL لاستخدام المزود المخصص.");
-    process.exit(1);
-  }
-  console.log("Custom API: تم العثور على AI_API_KEY و AI_BASE_URL.");
-} else {
-  console.error(`AI_PROVIDER="${provider}" غير معروف أو ينقصه الإعداد الصحيح.`);
+const allProviders = [provider, ...serviceProviders];
+const unsupported = allProviders.filter(
+  (p) => !["gemini", "openai", "xai", "custom"].includes(p)
+);
+if (unsupported.length) {
+  console.error(`Unsupported AI provider(s): ${unsupported.join(", ")}`);
   process.exit(1);
 }
 
-console.log(`مزود التشغيل الحالي: ${provider}`);
+const aiApiKey = process.env.AI_API_KEY?.trim();
+const geminiApiKey = process.env.GEMINI_API_KEY?.trim();
+const xaiApiKey = process.env.XAI_API_KEY?.trim();
+const baseUrl = process.env.AI_BASE_URL?.trim();
+
+function hasKeyFor(p) {
+  if (p === "gemini") return Boolean(geminiApiKey || aiApiKey);
+  if (p === "xai") return Boolean(xaiApiKey || aiApiKey);
+  if (p === "openai") return Boolean(aiApiKey);
+  if (p === "custom") return Boolean(aiApiKey && baseUrl);
+  return false;
+}
+
+for (const p of allProviders) {
+  if (!hasKeyFor(p)) {
+    if (p === "gemini") console.error("Set GEMINI_API_KEY or AI_API_KEY for Gemini.");
+    else if (p === "xai") console.error("Set XAI_API_KEY or AI_API_KEY for xAI.");
+    else if (p === "openai") console.error("Set AI_API_KEY for OpenAI.");
+    else if (p === "custom") console.error("Set AI_API_KEY and AI_BASE_URL for the custom provider.");
+    process.exit(1);
+  }
+}
+
+console.log(`AI provider: ${provider}`);
+console.log("AI env looks ready.");

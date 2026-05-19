@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import axios from "axios";
-import { Loader2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { TeacherExamDetailView } from "@/modules/exams/components/TeacherExamDetailView";
+import { PageLoading } from "@/common/components/dashboard/PageLoading";
 
 export default function TeacherExamDetailPage() {
   const params = useParams();
@@ -29,20 +30,18 @@ export default function TeacherExamDetailPage() {
   }, [id]);
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 py-24">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-sm font-black text-muted-foreground">
-          جارٍ تحميل تفاصيل الاختبار…
-        </p>
-      </div>
-    );
+    return <PageLoading message="جارٍ تحميل تفاصيل الاختبار…" />;
   }
 
   if (error || !exam) {
     return (
-      <div className="rounded-xl border border-[#D32F2F]/30 bg-[#FFEBEB] px-6 py-8 text-center font-bold text-[#D32F2F]">
-        {error || "غير موجود"}
+      <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-[#D32F2F]/30 bg-[#FFEBEB] px-6 py-16 text-center">
+        <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#D32F2F]/10 text-[#D32F2F]">
+          <AlertCircle className="h-7 w-7" />
+        </div>
+        <p className="text-base font-bold text-[#D32F2F]">
+          {error || "الاختبار غير موجود"}
+        </p>
       </div>
     );
   }

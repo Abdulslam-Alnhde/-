@@ -16,6 +16,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/common/ui/button";
 import { useExamStore } from "@/modules/exams/store/useExamStore";
+import {
+  validateExamStructure,
+  type StructureValidation,
+} from "@/modules/exams/lib/exam-structure";
 import { motion, AnimatePresence } from "@/common/lib/motion";
 
 function isPdf(f: File) {
@@ -28,13 +32,16 @@ function isImage(f: File) {
 }
 
 export function ExamUploadForm() {
-  const { setExtractedQuestions, setExamDetails, setStep } = useExamStore();
+  const { setExtractedQuestions, setExamDetails, setStep, examStructure } =
+    useExamStore();
 
   const [examFiles, setExamFiles] = useState<File[]>([]);
   const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
 
   const [isExtracting, setIsExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [structureError, setStructureError] =
+    useState<StructureValidation | null>(null);
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(
     null
   );
@@ -97,6 +104,7 @@ export function ExamUploadForm() {
 
     setIsExtracting(true);
     setError(null);
+    setStructureError(null);
 
     try {
       const formData = new FormData();
@@ -107,6 +115,9 @@ export function ExamUploadForm() {
       referenceFiles.forEach((file) => {
         formData.append("referenceFiles", file);
       });
+
+      // الهيكل المُعلَن من المعلم — يُمرَّر للـ AI كقالب متوقَّع
+      formData.append("expectedStructure", JSON.stringify(examStructure));
 
       const response = await axios.post("/api/services/extract-teacher", formData, {
         headers: {
@@ -120,6 +131,16 @@ export function ExamUploadForm() {
         response.data.questions &&
         Array.isArray(response.data.questions)
       ) {
+        // التحقق من تطابق نتيجة الاستخراج مع الهيكل المُعلَن
+        const validation = validateExamStructure(
+          examStructure,
+          response.data.questions
+        );
+        if (!validation.ok) {
+          setStructureError(validation);
+          return;
+        }
+
         setExtractedQuestions(response.data.questions);
         if (response.data.title && typeof response.data.title === "string") {
           setExamDetails({ aiSuggestedTitle: response.data.title.trim() });
@@ -381,6 +402,55 @@ export function ExamUploadForm() {
       </div>
 
       <div className="pt-4 w-full max-w-xl mx-auto">
+        {structureError && !structureError.ok && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mb-4 w-full rounded-2xl border-2 border-[#D32F2F]/25 bg-[#FFEBEB] p-4 text-right dark:bg-[#2A1616] dark:border-[#EF5350]/30"
+          >
+            <div className="flex items-center gap-2 text-[#D32F2F] dark:text-[#EF5350]">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <h4 className="text-sm font-black">
+                نتيجة الاستخراج لا تطابق الهيكل المُعلَن
+              </h4>
+            </div>
+            <p className="mt-1.5 text-xs font-medium text-[#D32F2F]/90 dark:text-[#EF5350]/90">
+              لا يمكن المتابعة حتى يتطابق الاستخراج مع ما حددته. راجع ملف
+              الاختبار وأعد الاستخراج، أو ارجع وصحّح الهيكل في خطوة البيانات.
+            </p>
+
+            <div className="mt-3 overflow-hidden rounded-xl border border-[#D32F2F]/20 bg-white dark:bg-[#1A2E2D]">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[#D32F2F]/15 bg-[#D32F2F]/[0.06] font-bold text-[#D32F2F] dark:text-[#EF5350]">
+                    <th className="px-3 py-2 text-right">البند</th>
+                    <th className="px-3 py-2 text-center">حدّدت</th>
+                    <th className="px-3 py-2 text-center">استُخرج</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {structureError.mismatches.map((m) => (
+                    <tr
+                      key={m.label}
+                      className="border-b border-[#D32F2F]/10 last:border-0"
+                    >
+                      <td className="px-3 py-2 font-bold text-foreground">
+                        {m.label}
+                      </td>
+                      <td className="px-3 py-2 text-center font-black tabular-nums text-foreground">
+                        {m.declared}
+                      </td>
+                      <td className="px-3 py-2 text-center font-black tabular-nums text-[#D32F2F] dark:text-[#EF5350]">
+                        {m.found}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
         {error && (
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}

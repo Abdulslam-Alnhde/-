@@ -3,11 +3,13 @@
 import { Suspense } from "react";
 import { useExamStore } from "@/modules/exams/store/useExamStore";
 import { motion, AnimatePresence } from "@/common/lib/motion";
-import { Check, Info, FileUp, Sparkles, Loader2 } from "lucide-react";
+import { Check, Info, FileUp, Sparkles } from "lucide-react";
 import { ExamBasicInfoForm } from "@/modules/exams/components/ExamBasicInfoForm";
 import { ExamUploadForm } from "@/modules/exams/components/ExamUploadForm";
 import { ExamReviewForm } from "@/modules/exams/components/ExamReviewForm";
 import { CreateExamEditLoader } from "@/modules/exams/components/CreateExamLoader";
+import { PageHeader } from "@/common/components/dashboard/PageHeader";
+import { PageLoading } from "@/common/components/dashboard/PageLoading";
 
 function CreateExamWizardInner() {
   const { step, setStep } = useExamStore();
@@ -23,9 +25,12 @@ function CreateExamWizardInner() {
       <CreateExamEditLoader />
 
       {/* Page title */}
-      <header className="mb-8 text-right">
-        <h1 className="text-2xl font-bold text-foreground">اختبار جديد</h1>
-      </header>
+      <PageHeader
+        eyebrow="الأستاذ"
+        title="إنشاء اختبار جديد"
+        subtitle="اتبع الخطوات الثلاث لرفع الاختبار وإرساله للجنة المراجعة."
+        className="mb-10"
+      />
 
       {/* STEPS HEADER */}
       <div className="w-full max-w-2xl mx-auto mb-12">
@@ -103,14 +108,7 @@ function CreateExamWizardInner() {
 
 export default function CreateExamWizard() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col items-center justify-center gap-3 py-24">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-sm font-bold text-muted-foreground">جارٍ التحميل…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<PageLoading message="جارٍ التحميل…" />}>
       <CreateExamWizardInner />
     </Suspense>
   );

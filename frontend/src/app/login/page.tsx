@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Lock, Mail } from "lucide-react";
+import { ArrowLeft, Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/common/ui/button";
 import Link from "next/link";
 import { AlarabLogo } from "@/common/components/brand/AlarabLogo";
@@ -88,83 +88,186 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-brand-teal-light dark:bg-background">
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-8 lg:py-12">
-        <div className="w-full max-w-[420px] rounded-2xl bg-card p-8 shadow-lg dark:shadow-black/30 sm:p-10">
-          <div className="mb-8 flex flex-col items-center text-center">
-            <div className="mb-6">
-              <AlarabLogo size="lg" priority />
+    <div className="flex min-h-screen flex-col bg-[#F5F7F7] lg:flex-row-reverse">
+      {/* ====== Brand panel (right in RTL) — LIGHT THEME ====== */}
+      <aside className="relative hidden flex-1 overflow-hidden border-l border-brand-teal/15 bg-gradient-to-bl from-brand-teal-light/60 via-white to-brand-orange/5 lg:flex lg:flex-col lg:justify-between lg:p-12 xl:p-16">
+        {/* soft decorative blobs */}
+        <div
+          className="pointer-events-none absolute -left-20 -top-20 h-72 w-72 rounded-full bg-brand-teal/15 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-24 right-1/4 h-72 w-72 rounded-full bg-brand-orange/12 blur-3xl"
+          aria-hidden
+        />
+
+        {/* Top: brand */}
+        <div className="relative">
+          <Link href="/" className="group inline-flex items-center gap-3">
+            <div className="rounded-2xl bg-gradient-to-br from-brand-teal to-brand-teal-dark p-1 shadow-md shadow-brand-teal/30 transition group-hover:scale-105">
+              <div className="rounded-[14px] bg-white p-1.5">
+                <AlarabLogo size="sm" priority />
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-foreground">
-              تسجيل الدخول
-            </h1>
+            <div className="flex flex-col leading-tight">
+              <span className="text-base font-bold text-brand-teal-dark">جامعة العرب</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-orange">
+                Exams Platform
+              </span>
+            </div>
+          </Link>
+        </div>
+
+        {/* Middle: tagline + bullets */}
+        <div className="relative max-w-md">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-brand-teal-dark shadow-sm ring-1 ring-brand-teal/20">
+            <Sparkles className="h-3.5 w-3.5 text-brand-orange" />
+            بوابة الاختبارات الذكية
+          </span>
+          <h2
+            className="mt-5 text-3xl font-black leading-[1.2] xl:text-4xl"
+            style={{ color: "#1A2E2D" }}
+          >
+            ادخل وباشر
+            <br />
+            <span className="bg-gradient-to-l from-brand-orange via-[#F58A4D] to-brand-teal bg-clip-text text-transparent">
+              تصحيحًا أسرع وأدقّ
+            </span>
+          </h2>
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            منصّة موحّدة للأستاذ واللجنة والإدارة — مسار واضح من إنشاء الاختبار
+            وحتى تسليم الدرجات.
+          </p>
+
+          <ul className="mt-8 space-y-3 text-sm">
+            {[
+              "تصحيح بالذكاء الاصطناعي بدقة عالية",
+              "مراجعة موحّدة لجان واعتماد",
+              "تقارير ودرجات فورية قابلة للتصدير",
+            ].map((t) => (
+              <li key={t} className="flex items-center gap-3 font-medium text-foreground/85">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-brand-teal to-brand-teal-dark text-white shadow-sm shadow-brand-teal/30">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                </span>
+                {t}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Bottom */}
+        <p className="relative text-xs font-medium text-muted-foreground/80">
+          © {new Date().getFullYear()} جامعة العرب
+        </p>
+      </aside>
+
+      {/* ====== Form panel (left in RTL) ====== */}
+      <main className="relative flex flex-1 items-center justify-center bg-white px-4 py-10 sm:px-8 lg:py-12">
+        {/* mobile top header */}
+        <div className="absolute left-0 right-0 top-0 flex items-center justify-between border-b border-brand-teal/15 bg-gradient-to-l from-brand-teal-light/60 to-white px-4 py-3 lg:hidden">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="rounded-lg bg-gradient-to-br from-brand-teal to-brand-teal-dark p-0.5">
+              <div className="rounded-md bg-white p-1">
+                <AlarabLogo size="sm" />
+              </div>
+            </div>
+            <span className="text-sm font-bold text-brand-teal-dark">جامعة العرب</span>
+          </Link>
+        </div>
+
+        <div className="mt-12 w-full max-w-[440px] lg:mt-0">
+          <div className="rounded-3xl border border-border bg-card p-8 shadow-xl shadow-brand-teal/10 sm:p-10">
+            <div className="mb-8 text-right">
+              <span className="inline-block rounded-full bg-brand-teal-light px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-teal-dark">
+                تسجيل دخول
+              </span>
+              <h1
+                className="mt-3 text-2xl font-black tracking-tight md:text-3xl"
+                style={{ color: "#1A2E2D" }}
+              >
+                مرحبًا بعودتك
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                ادخل بياناتك الجامعية للوصول إلى لوحتك.
+              </p>
+            </div>
+
+            {error && (
+              <div className="mb-5 flex items-start gap-3 rounded-2xl border border-[#D32F2F]/30 bg-[#FFEBEB] px-4 py-3 text-sm font-semibold text-[#D32F2F]">
+                <span className="mt-0.5 inline-block h-2 w-2 shrink-0 rounded-full bg-[#D32F2F]" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <label className="block text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  البريد الإلكتروني
+                </label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-teal/70" />
+                  <input
+                    type="email"
+                    autoComplete="username"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    dir="ltr"
+                    className="w-full rounded-2xl border-2 border-border bg-white py-3.5 pl-4 pr-12 text-sm font-semibold text-foreground shadow-sm outline-none transition focus:border-brand-teal focus:bg-brand-teal-light/30 focus:ring-4 focus:ring-brand-teal/15"
+                    placeholder="name@university.edu"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  كلمة المرور
+                </label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-teal/70" />
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-2xl border-2 border-border bg-white py-3.5 pl-4 pr-12 text-sm font-semibold text-foreground shadow-sm outline-none transition focus:border-brand-teal focus:bg-brand-teal-light/30 focus:ring-4 focus:ring-brand-teal/15"
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="group h-[52px] w-full rounded-2xl bg-brand-orange text-base font-black text-white shadow-lg shadow-brand-orange/30 transition hover:bg-brand-orange-dark hover:shadow-xl disabled:opacity-70"
+              >
+                {loading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    دخول
+                    <ArrowLeft className="h-4 w-4 transition group-hover:-translate-x-1" />
+                  </span>
+                )}
+              </Button>
+            </form>
+
+            <p className="mt-8 text-center text-xs text-muted-foreground">
+              <Link
+                href="/"
+                className="font-bold text-brand-teal hover:text-brand-teal-dark transition-colors"
+              >
+                ← العودة للصفحة الرئيسية
+              </Link>
+            </p>
           </div>
 
-          {error && (
-            <div className="mb-5 rounded-2xl border border-[#D32F2F]/30 bg-[#FFEBEB] px-4 py-3 text-sm font-bold text-[#D32F2F] dark:bg-[#2A1616] dark:border-[#D32F2F]/40 dark:text-[#EF5350]">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <label className="block text-right text-xs font-medium text-muted-foreground">
-                البريد الإلكتروني
-              </label>
-              <div className="relative">
-                <Mail className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-teal/70" />
-                <input
-                  type="email"
-                  autoComplete="username"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  dir="ltr"
-                  className="w-full rounded-full border-2 border-border bg-card py-3.5 pl-4 pr-11 text-sm font-semibold text-foreground shadow-sm outline-none transition focus:border-brand-teal focus:ring-4 focus:ring-brand-teal/15"
-                  placeholder="name@university.edu"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="block text-right text-xs font-medium text-muted-foreground">
-                كلمة المرور
-              </label>
-              <div className="relative">
-                <Lock className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-teal/70" />
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-full border-2 border-border bg-card py-3.5 pl-4 pr-11 text-sm font-semibold text-foreground shadow-sm outline-none transition focus:border-brand-teal focus:ring-4 focus:ring-brand-teal/15"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="h-12 w-full rounded-full bg-primary text-base font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-brand-teal-dark disabled:opacity-70"
-            >
-              {loading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                "دخول"
-              )}
-            </Button>
-          </form>
-
-          <p className="mt-8 text-center text-xs text-muted-foreground">
-            <Link
-              href="/"
-              className="font-bold text-brand-teal hover:text-brand-teal-dark hover:underline transition-colors"
-            >
-              العودة للصفحة الرئيسية
-            </Link>
+          <p className="mt-6 text-center text-[11px] text-muted-foreground">
+            بدخولك توافق على سياسة الاستخدام الخاصة بمنصّة جامعة العرب.
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
@@ -173,7 +276,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-brand-teal-light">
+        <div className="flex min-h-screen items-center justify-center bg-[#F5F7F7]">
           <Loader2 className="h-10 w-10 animate-spin text-brand-teal" />
         </div>
       }

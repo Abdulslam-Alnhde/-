@@ -1,12 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-import { 
-  Inbox, Bell, CheckCircle, Clock, Trash2, 
-  MessageSquare, AlertCircle, Loader2, Sparkles
+import {
+  Inbox,
+  Bell,
+  CheckCircle,
+  Clock,
+  Trash2,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/common/ui/button";
+import { cn } from "@/common/lib/utils";
+import { PageHeader } from "@/common/components/dashboard/PageHeader";
+import { SectionCard } from "@/common/components/dashboard/SectionCard";
+import { PageLoading } from "@/common/components/dashboard/PageLoading";
+import { EmptyState } from "@/common/components/dashboard/EmptyState";
 
 export default function TeacherInboxPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -36,110 +45,145 @@ export default function TeacherInboxPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-      setNotifications(notifications.map(n => n.id === id ? { ...n, isRead: true } : n));
+      setNotifications(
+        notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
     } catch (err) {
       console.error(err);
     }
   };
 
-
   const getTypeStyles = (type: string) => {
     switch (type) {
       case "status_change":
-        return "bg-brand-teal/10 text-brand-teal";
       case "graded":
-        return "bg-brand-teal/10 text-brand-teal";
+        return "bg-brand-teal-light text-brand-teal";
       case "alert":
-        return "bg-[#FFEBEB] text-[#D32F2F] dark:bg-[#2A1616] dark:text-[#EF5350]";
+        return "bg-[#FFEBEB] text-[#D32F2F]";
       default:
-        return "bg-primary/10 text-primary";
+        return "bg-brand-orange/10 text-brand-orange";
     }
   };
 
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
   return (
-    <div className="flex h-full flex-col space-y-8">
-      <div className="flex shrink-0 flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            التنبيهات
-          </h1>
-        </div>
-        <div className="flex gap-2">
-           <Button variant="outline" size="sm" className="gap-2 font-medium rounded-xl h-9" onClick={fetchNotifications}>
-             <Sparkles className="w-4 h-4" /> تحديث
-           </Button>
-        </div>
-      </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <PageHeader
+        eyebrow="الأستاذ"
+        title="التنبيهات"
+        subtitle="إشعارات حالة الاختبارات والتصحيح والملاحظات."
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 gap-2 rounded-xl font-bold"
+            onClick={fetchNotifications}
+          >
+            <RefreshCw className="h-4 w-4" /> تحديث
+          </Button>
+        }
+      />
 
-      <div className="bg-card border rounded-2xl shadow-lg shadow-black/5 flex-1 min-h-0 flex flex-col overflow-hidden">
-        <div className="p-4 border-b flex items-center justify-between bg-muted/10">
-           <div className="flex items-center gap-2 font-medium text-sm">
-             <Inbox className="w-4 h-4 text-primary" /> الوارد
-             <span className="bg-primary text-primary-foreground px-2 py-0.5 rounded-full text-xs">
-               {notifications.filter(n => !n.isRead).length}
-             </span>
-           </div>
-        </div>
+      <SectionCard
+        title="الوارد"
+        icon={Inbox}
+        action={
+          unreadCount > 0 && (
+            <span className="rounded-full bg-brand-teal px-2.5 py-0.5 text-xs font-bold text-white">
+              {unreadCount} جديد
+            </span>
+          )
+        }
+      >
+        {loading ? (
+          <PageLoading message="جارِ تحميل التنبيهات..." />
+        ) : notifications.length === 0 ? (
+          <EmptyState
+            icon={Bell}
+            title="لا توجد تنبيهات"
+            description="ستظهر هنا إشعارات حالة اختباراتك ونتائج التصحيح."
+          />
+        ) : (
+          <div className="divide-y divide-border">
+            {notifications.map((n) => (
+              <div
+                key={n.id}
+                onClick={() => !n.isRead && markAsRead(n.id)}
+                className={cn(
+                  "group relative flex cursor-pointer items-start gap-4 px-6 py-5 transition-colors hover:bg-muted/40",
+                  !n.isRead && "bg-brand-teal-light/40"
+                )}
+              >
+                {!n.isRead && (
+                  <span className="absolute right-0 top-0 bottom-0 w-1 bg-brand-teal" />
+                )}
 
-        <div className="flex-1 overflow-y-auto">
-          {loading ? (
-             <div className="flex flex-col items-center justify-center h-full gap-4">
-                <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                <p className="text-sm font-medium text-muted-foreground">جارِ التحميل...</p>
-             </div>
-          ) : notifications.length === 0 ? (
-             <div className="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-40">
-                <div className="bg-muted p-6 rounded-full"><Bell className="w-10 h-10 text-muted-foreground" /></div>
-                <h3 className="text-base font-semibold">لا توجد تنبيهات</h3>
-             </div>
-          ) : (
-             <div className="divide-y divide-border/50">
-                 {notifications.map((n) => (
-                   <div
-                     key={n.id}
-                     onClick={() => !n.isRead && markAsRead(n.id)}
-                     className={`group relative flex cursor-pointer items-start gap-5 p-6 transition-colors hover:bg-muted/30 ${!n.isRead ? "bg-primary/5 shadow-inner" : ""}`}
-                   >
-                      {!n.isRead && (
-                        <div className="absolute right-0 top-0 bottom-0 w-1 bg-primary" />
+                <div
+                  className={cn(
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                    getTypeStyles(n.type)
+                  )}
+                >
+                  {n.type === "status_change" ? (
+                    <Clock className="h-5 w-5" />
+                  ) : n.type === "graded" ? (
+                    <CheckCircle className="h-5 w-5" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5" />
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <h4
+                      className={cn(
+                        "text-sm font-bold",
+                        !n.isRead ? "text-brand-teal-dark" : "text-foreground"
                       )}
-                      
-                      <div className={`shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm ${getTypeStyles(n.type)}`}>
-                        {n.type === "status_change" ? <Clock className="w-6 h-6" /> : 
-                         n.type === "graded" ? <CheckCircle className="w-6 h-6" /> : 
-                         <AlertCircle className="w-6 h-6" />}
-                      </div>
+                    >
+                      {n.title}
+                    </h4>
+                    <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {new Date(n.createdAt).toLocaleTimeString("ar-EG", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                  <p
+                    className={cn(
+                      "text-sm leading-relaxed",
+                      !n.isRead
+                        ? "font-medium text-foreground"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {n.message}
+                  </p>
+                  <p className="pt-1 text-[11px] text-muted-foreground">
+                    {new Date(n.createdAt).toLocaleDateString("ar-EG")}
+                  </p>
+                </div>
 
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <h4 className={`font-semibold text-sm ${!n.isRead ? "text-primary" : "text-foreground"}`}>{n.title}</h4>
-                          <span className="text-xs text-muted-foreground flex items-center gap-1.5 opacity-60">
-                            <Clock className="w-3 h-3" />
-                            {new Date(n.createdAt).toLocaleTimeString("ar-EG", { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p className={`text-sm leading-relaxed ${!n.isRead ? "text-foreground/80 font-bold" : "text-muted-foreground font-medium"}`}>
-                          {n.message}
-                        </p>
-                        <div className="pt-2 text-xs text-muted-foreground opacity-60">
-                           {new Date(n.createdAt).toLocaleDateString("ar-EG")}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-2 items-end">
-                         {!n.isRead && (
-                            <div className="w-2 h-2 rounded-full bg-primary shadow-sm shadow-primary/50" />
-                         )}
-                         <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                            <Trash2 className="w-4 h-4" />
-                         </Button>
-                      </div>
-                   </div>
-                 ))}
-             </div>
-          )}
-        </div>
-      </div>
+                <div className="flex flex-col items-end gap-2">
+                  {!n.isRead && (
+                    <span className="h-2 w-2 rounded-full bg-brand-teal" />
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full text-muted-foreground opacity-0 transition-opacity hover:text-[#D32F2F] group-hover:opacity-100"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
     </div>
   );
 }

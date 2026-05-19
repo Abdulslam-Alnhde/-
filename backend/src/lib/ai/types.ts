@@ -35,7 +35,6 @@ export type AIProviderKind =
   | "openai"
   | "xai"
   | "custom"
-  | "ollama"
   | "gemini";
 
 export interface AIServiceConfig {

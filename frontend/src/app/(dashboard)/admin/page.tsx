@@ -2,12 +2,24 @@
 
 import { useEffect, useState } from "react";
 import {
-  ShieldAlert, Settings, Users, FileText,
-  Activity, Zap, Database, ArrowUpRight, Loader2
+  ShieldAlert,
+  Settings,
+  Users,
+  FileText,
+  Activity,
+  Zap,
+  Database,
+  ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/common/ui/button";
 import Link from "next/link";
 import { ADMIN_LINKS } from "@/common/lib/dashboard-links";
+import { PageHeader } from "@/common/components/dashboard/PageHeader";
+import { StatCard } from "@/common/components/dashboard/StatCard";
+import { StatusBadge } from "@/common/components/dashboard/StatusBadge";
+import { EmptyState } from "@/common/components/dashboard/EmptyState";
+import { PageLoading } from "@/common/components/dashboard/PageLoading";
+import { SectionCard } from "@/common/components/dashboard/SectionCard";
 
 export default function AdminDashboard() {
   const [data, setData] = useState<any>(null);
@@ -15,198 +27,232 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetch("/api/admin/stats")
-      .then(res => res.json())
-      .then(d => setData(d))
-      .catch(() => setData({
-        metrics: { totalUsers: 0, totalExams: 0, totalQuestions: 0, totalNotifications: 0 },
-        roleDistribution: [],
-        recentExams: []
-      }))
+      .then((res) => res.json())
+      .then((d) => setData(d))
+      .catch(() =>
+        setData({
+          metrics: {
+            totalUsers: 0,
+            totalExams: 0,
+            totalQuestions: 0,
+            totalNotifications: 0,
+          },
+          roleDistribution: [],
+          recentExams: [],
+        })
+      )
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-20 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-primary" />
-        <p className="text-sm font-black tracking-widest text-muted-foreground">جارِ تحميل بيانات النظام...</p>
-      </div>
-    );
+    return <PageLoading message="جارِ تحميل بيانات النظام..." />;
   }
 
-  const metrics = data?.metrics || { totalUsers: 0, totalExams: 0, totalQuestions: 0, totalNotifications: 0 };
+  const metrics = data?.metrics || {
+    totalUsers: 0,
+    totalExams: 0,
+    totalQuestions: 0,
+    totalNotifications: 0,
+  };
   const roleDistribution = data?.roleDistribution || [];
   const recentExams = data?.recentExams || [];
 
-  const statCards: {
-    label: string;
-    val: number;
-    icon: typeof Users;
-    color: string;
-    detail: string;
-    href: string;
-  }[] = [
-    {
-      label: "إجمالي الحسابات",
-      val: metrics.totalUsers,
-      icon: Users,
-      color: "text-brand-teal",
-      detail: "المستخدمين المسجلين",
-      href: ADMIN_LINKS.users,
-    },
-    {
-      label: "الاختبارات المصدرة",
-      val: metrics.totalExams,
-      icon: FileText,
-      color: "text-brand-teal",
-      detail: "جميع الحالات",
-      href: ADMIN_LINKS.examsLog,
-    },
-    {
-      label: "نقاط التقييم",
-      val: metrics.totalQuestions * 3,
-      icon: Zap,
-      color: "text-brand-orange",
-      detail: "إجمالي النقاط",
-      href: ADMIN_LINKS.examsLog,
-    },
-    {
-      label: "حجم الإشعارات",
-      val: metrics.totalNotifications,
-      icon: ShieldAlert,
-      color: "text-brand-teal",
-      detail: "مشاكل حرجة: ٠",
-      href: ADMIN_LINKS.settings,
-    },
-  ];
+  const roleLabels: Record<string, string> = {
+    TEACHER: "الأساتذة",
+    COMMITTEE: "أعضاء اللجنة",
+    ADMIN: "مديرو النظام",
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div className="flex flex-col md:flex-row items-baseline md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">لوحة الإدارة</h1>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" asChild className="gap-2 font-medium rounded-xl border h-10">
-            <Link href={ADMIN_LINKS.settings}><Settings className="w-4 h-4" /> الإعدادات</Link>
-          </Button>
-          <Button asChild className="gap-2 bg-primary text-white hover:bg-[#008F84] font-medium rounded-xl h-10 shadow-md shadow-primary/20">
-            <Link href={ADMIN_LINKS.users}><Users className="w-4 h-4" /> المستخدمون</Link>
-          </Button>
-        </div>
+      <PageHeader
+        eyebrow="إدارة النظام"
+        title="لوحة الإدارة"
+        subtitle="نظرة شاملة على المستخدمين والاختبارات والنشاط العام للمنصة."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              asChild
+              className="h-11 gap-2 rounded-xl border border-border bg-card px-5 font-bold text-foreground transition hover:border-foreground/30"
+            >
+              <Link href={ADMIN_LINKS.settings}>
+                <Settings className="h-4 w-4" /> الإعدادات
+              </Link>
+            </Button>
+            <Button
+              asChild
+              className="h-11 gap-2 rounded-xl bg-foreground px-5 font-bold text-background transition hover:bg-foreground/85"
+            >
+              <Link href={ADMIN_LINKS.users}>
+                <Users className="h-4 w-4" /> المستخدمون
+              </Link>
+            </Button>
+          </>
+        }
+      />
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="إجمالي الحسابات"
+          value={metrics.totalUsers}
+          icon={Users}
+          tone="teal"
+          hint="المستخدمين المسجَّلين"
+          href={ADMIN_LINKS.users}
+        />
+        <StatCard
+          label="الاختبارات"
+          value={metrics.totalExams}
+          icon={FileText}
+          tone="teal"
+          hint="جميع الحالات"
+          href={ADMIN_LINKS.examsLog}
+        />
+        <StatCard
+          label="نقاط التقييم"
+          value={metrics.totalQuestions * 3}
+          icon={Zap}
+          tone="orange"
+          hint="إجمالي النقاط"
+          href={ADMIN_LINKS.examsLog}
+        />
+        <StatCard
+          label="الإشعارات"
+          value={metrics.totalNotifications}
+          icon={ShieldAlert}
+          tone="neutral"
+          hint="مشاكل حرجة: ٠"
+          href={ADMIN_LINKS.settings}
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((item, i) => (
-          <Link
-            key={i}
-            href={item.href}
-            className="group flex cursor-pointer flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm transition-all hover:border-brand-teal/40 hover:shadow-lg hover:shadow-black/8"
-          >
-            <div className="flex justify-between items-start">
-              <div className={`p-4 rounded-2xl bg-muted group-hover:bg-primary/5 transition-colors shadow-inner ${item.color}`}>
-                <item.icon className="w-7 h-7" />
-              </div>
-              <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground leading-none mb-2 opacity-70">{item.label}</p>
-              <h3 className="text-3xl font-bold mt-1 leading-none text-foreground tabular-nums">{item.val}</h3>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Two-column: exams log + side panels */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <div
-            id="exams-log"
-            className="scroll-mt-8 bg-card border-2 rounded-[2.5rem] shadow-lg shadow-black/5 flex flex-col overflow-hidden"
+          <SectionCard
+            title="سجل الاختبارات"
+            icon={Activity}
+            action={
+              <Button
+                variant="ghost"
+                asChild
+                className="h-8 gap-1 px-3 text-xs font-bold text-brand-teal-dark hover:bg-brand-teal/10"
+              >
+                <Link href={ADMIN_LINKS.examsLog}>
+                  عرض الكل <ChevronLeft className="h-3 w-3" />
+                </Link>
+              </Button>
+            }
           >
-            <div className="p-6 border-b flex items-center justify-between bg-muted/5">
-              <h3 className="text-base font-semibold flex items-center gap-2"><Activity className="w-4 h-4 text-primary" /> سجل الاختبارات</h3>
-            </div>
-            <div className="overflow-x-auto">
-              {recentExams.length === 0 ? (
-                <div className="p-20 text-center text-muted-foreground text-sm font-bold opacity-40">لا توجد اختبارات مسجلة بعد.</div>
+            {recentExams.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="لا توجد اختبارات مسجّلة بعد"
+                description="ستظهر هنا أحدث الاختبارات مع حالاتها فور إنشائها."
+              />
+            ) : (
+              <ul className="divide-y divide-border">
+                {recentExams.map((exam: any) => {
+                  const teacherName = exam.teacher?.name || "النظام";
+                  const initials = teacherName
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((s: string) => s[0])
+                    .join("")
+                    .toUpperCase() || "?";
+                  return (
+                    <li
+                      key={exam.id}
+                      className="group relative flex flex-wrap items-center gap-4 px-6 py-4 transition hover:bg-brand-teal-light/20"
+                    >
+                      <span className="absolute inset-y-0 right-0 w-1 origin-bottom scale-y-0 bg-gradient-to-t from-brand-teal to-brand-orange transition-transform group-hover:scale-y-100" />
+
+                      <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-teal to-brand-teal-dark text-xs font-black text-white shadow-md shadow-brand-teal/30">
+                        {initials}
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-foreground">
+                          {teacherName}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {exam.title}
+                        </p>
+                      </div>
+
+                      <StatusBadge status={exam.status} />
+                      <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                        {new Date(exam.createdAt).toLocaleDateString("ar-EG")}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </SectionCard>
+        </div>
+
+        {/* Side column */}
+        <div className="space-y-6">
+          <SectionCard title="توزيع الأدوار" icon={Database}>
+            <div className="p-6">
+              {roleDistribution.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  لا يوجد مستخدمون بعد
+                </p>
               ) : (
-                <table className="w-full text-sm text-right">
-                  <thead className="border-b bg-[#F8F8F8] text-muted-foreground font-medium text-xs dark:bg-[#162A28] dark:text-[#A8C8C6]">
-                    <tr>
-                      <th className="py-5 px-8">المصدر</th>
-                      <th className="py-5 px-8">الموضوع</th>
-                      <th className="py-5 px-8">الحالة</th>
-                      <th className="py-5 px-8 text-left">التاريخ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y-2">
-                    {recentExams.map((exam: any) => (
-                      <tr key={exam.id} className="hover:bg-[#F0FAFA] transition-colors cursor-pointer group dark:hover:bg-[#1E3530]">
-                        <td className="py-5 px-8 font-medium text-foreground text-sm">{exam.teacher?.name || "النظام"}</td>
-                        <td className="py-5 px-8 text-muted-foreground font-medium truncate max-w-[200px]">{exam.title}</td>
-                        <td className="py-5 px-8">
-                          <span className={`px-3 py-1 rounded-lg text-xs font-medium ring-1 ring-inset ${
-                            exam.status === 'APPROVED' ? 'bg-brand-teal/10 text-brand-teal ring-brand-teal/20' :
-                            exam.status === 'PENDING_APPROVAL' ? 'bg-brand-orange/10 text-brand-orange ring-brand-orange/20' :
-                            exam.status === 'REJECTED' ? 'bg-[#FFEBEB] text-[#D32F2F] ring-[#D32F2F]/20' :
-                            'bg-muted text-muted-foreground ring-border'
-                          }`}>
-                            {exam.status === 'APPROVED' ? 'معتمد' : exam.status === 'PENDING_APPROVAL' ? 'قيد المراجعة' : exam.status === 'REJECTED' ? 'مرفوض' : 'مسودة'}
+                <div className="space-y-5">
+                  {roleDistribution.map((dist: any, i: number) => {
+                    const pct =
+                      metrics.totalUsers > 0
+                        ? (dist._count.id / metrics.totalUsers) * 100
+                        : 0;
+                    return (
+                      <div key={i} className="space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold">
+                          <span className="text-foreground">
+                            {roleLabels[dist.role] || dist.role}
                           </span>
-                        </td>
-                        <td className="py-5 px-8 text-left text-muted-foreground text-xs font-medium tabular-nums">
-                          {new Date(exam.createdAt).toLocaleDateString("ar-EG")}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          <span className="tabular-nums text-muted-foreground">
+                            {dist._count.id}
+                          </span>
+                        </div>
+                        <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-l from-brand-teal-dark via-brand-teal to-brand-teal shadow-sm shadow-brand-teal/40 transition-all duration-1000"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
-          </div>
-        </div>
+          </SectionCard>
 
-        <div className="space-y-6">
-          <div
-            id="roles-distribution"
-            className="scroll-mt-8 bg-card border rounded-2xl p-6 shadow-sm"
-          >
-            <h4 className="font-semibold text-sm mb-6 flex items-center gap-2 text-foreground">
-              <Database className="w-4 h-4 text-primary" /> توزيع الأدوار
-            </h4>
-            {roleDistribution.length === 0 ? (
-              <p className="text-sm text-muted-foreground opacity-50 text-center py-4">لا يوجد مستخدمون بعد</p>
-            ) : (
-              <div className="space-y-6">
-                {roleDistribution.map((dist: any, i: number) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex justify-between text-xs font-medium">
-                      <span>{dist.role === 'TEACHER' ? 'الأساتذة' : dist.role === 'COMMITTEE' ? 'أعضاء اللجنة' : 'مديرو النظام'}</span>
-                      <span className="text-muted-foreground tabular-nums">{dist._count.id}</span>
-                    </div>
-                    <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full shadow-sm shadow-primary/30 transition-all duration-1000"
-                        style={{ width: metrics.totalUsers > 0 ? `${(dist._count.id / metrics.totalUsers) * 100}%` : '0%' }}
-                      />
-                    </div>
-                  </div>
-                ))}
+          <div className="group relative overflow-hidden rounded-3xl border-2 border-brand-orange/25 bg-gradient-to-bl from-brand-orange/10 via-white to-brand-teal-light/30 p-6 shadow-sm transition hover:shadow-md">
+            <div
+              className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-brand-orange/15 blur-3xl"
+              aria-hidden
+            />
+            <div className="relative z-10">
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-orange to-brand-orange-dark text-white shadow-lg shadow-brand-orange/30 transition group-hover:rotate-3 group-hover:scale-110">
+                <ShieldAlert className="h-5 w-5" />
               </div>
-            )}
-          </div>
-
-          <div className="relative overflow-hidden rounded-2xl border border-[#E8E8E8] bg-card p-6 shadow-sm group">
-            <div className="relative z-10 flex flex-col h-full gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand-teal/15 flex items-center justify-center shadow-inner ring-1 ring-brand-teal/20">
-                <ShieldAlert className="w-5 h-5 text-brand-teal" />
-              </div>
-              <h4 className="font-semibold text-base mt-1 text-foreground">الفحص الأمني</h4>
-              <Button className="mt-4 w-full font-medium text-sm bg-primary text-primary-foreground hover:bg-[#008F84] h-10 rounded-xl shadow shadow-primary/20">
+              <h4 className="mt-4 text-base font-bold" style={{ color: "#1A2E2D" }}>
+                الفحص الأمني
+              </h4>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                تشغيل فحص شامل على المنصّة للتأكّد من سلامة الإعدادات.
+              </p>
+              <Button className="mt-5 h-11 w-full gap-2 rounded-xl bg-brand-orange text-sm font-bold text-white shadow-md shadow-brand-orange/30 transition hover:bg-brand-orange-dark">
                 تشغيل الفحص
               </Button>
             </div>
-            <Activity className="absolute -left-12 -bottom-12 w-48 h-48 text-brand-teal opacity-[0.06] group-hover:scale-125 transition-transform [transition-duration:2s] pointer-events-none" />
           </div>
         </div>
       </div>

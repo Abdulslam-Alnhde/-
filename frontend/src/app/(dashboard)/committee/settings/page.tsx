@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { SettingsForm } from "@/common/components/shared/SettingsForm";
 import { SupportRequestPanel } from "@/common/components/shared/SupportRequestPanel";
-import { Loader2, ShieldCheck, Mail, User, Lock, BellRing } from "lucide-react";
+import { Lock, BellRing } from "lucide-react";
 import { Button } from "@/common/ui/button";
+import { PageHeader } from "@/common/components/dashboard/PageHeader";
+import { PageLoading } from "@/common/components/dashboard/PageLoading";
 
 export default function CommitteeSettingsPage() {
   const [userData, setUserData] = useState<any>(null);
@@ -27,43 +29,71 @@ export default function CommitteeSettingsPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-20 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-primary" />
-        <p className="text-sm font-black tracking-widest text-muted-foreground">جارِ تحميل الإعدادات...</p>
-      </div>
-    );
+    return <PageLoading message="جارِ تحميل الإعدادات..." />;
   }
 
-  return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">الإعدادات</h1>
-      </div>
+  const securityRows = [
+    {
+      icon: Lock,
+      tone: "teal" as const,
+      label: "المصادقة الثنائية",
+      action: "تفعيل",
+    },
+    {
+      icon: BellRing,
+      tone: "orange" as const,
+      label: "تنبيهات المراجعة",
+      action: "إدارة",
+    },
+  ];
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <PageHeader
+        eyebrow="لجنة المراجعة"
+        title="الإعدادات"
+        subtitle="حدّث بياناتك وإعدادات الأمان وتواصل مع الدعم."
+      />
+
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
         <div className="md:col-span-2">
           <SettingsForm initialData={userData} />
         </div>
-        
+
         <div className="space-y-6">
-          <div className="bg-card border rounded-2xl p-6 shadow-sm">
-            <h4 className="font-semibold text-xs text-muted-foreground mb-5">الأمان</h4>
+          <div className="rounded-2xl bg-card p-6 ring-1 ring-border">
+            <h4 className="mb-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              الأمان
+            </h4>
             <div className="space-y-3">
-               <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+              {securityRows.map((row) => (
+                <div
+                  key={row.label}
+                  className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-3"
+                >
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-brand-teal/10 text-brand-teal"><Lock className="w-4 h-4" /></div>
-                    <span className="text-xs font-medium text-muted-foreground">المصادقة الثنائية</span>
+                    <div
+                      className={
+                        row.tone === "teal"
+                          ? "flex h-10 w-10 items-center justify-center rounded-xl bg-brand-teal-light text-brand-teal"
+                          : "flex h-10 w-10 items-center justify-center rounded-xl bg-brand-orange/10 text-brand-orange"
+                      }
+                    >
+                      <row.icon className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-bold text-foreground">
+                      {row.label}
+                    </span>
                   </div>
-                  <Button variant="outline" size="sm" className="h-8 text-xs px-3 font-medium rounded-lg">تفعيل</Button>
-               </div>
-               <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-brand-orange/10 text-brand-orange"><BellRing className="w-4 h-4" /></div>
-                    <span className="text-xs font-medium text-muted-foreground">تنبيهات المراجعة</span>
-                  </div>
-                  <Button variant="outline" size="sm" className="h-8 text-xs px-3 font-medium rounded-lg">إدارة</Button>
-               </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-lg px-3 text-xs font-bold"
+                  >
+                    {row.action}
+                  </Button>
+                </div>
+              ))}
             </div>
           </div>
 
