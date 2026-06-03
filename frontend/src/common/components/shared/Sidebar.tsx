@@ -146,9 +146,9 @@ export function Sidebar({
                   : "text-foreground/70 hover:bg-brand-teal-light hover:text-brand-teal-dark"
               )}
             >
-              {/* active indicator bar (orange) */}
+              {/* active indicator bar */}
               {active && (
-                <span className="absolute right-0 top-1/2 h-6 w-1 -translate-y-1/2 -translate-x-2 rounded-l-full bg-brand-orange shadow-sm shadow-brand-orange/50" />
+                <span className="absolute right-0 top-1/2 h-6 w-1 -translate-y-1/2 -translate-x-2 rounded-l-full bg-white/90 shadow-sm shadow-brand-teal/30" />
               )}
               <item.icon
                 className={cn(
@@ -174,7 +174,7 @@ export function Sidebar({
             <span className="block truncate text-sm font-bold text-foreground">
               {userName}
             </span>
-            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-brand-orange/15 px-2 py-0.5 text-[10px] font-bold text-brand-orange-dark ring-1 ring-brand-orange/30">
+            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-brand-teal-light px-2 py-0.5 text-[10px] font-bold text-brand-teal-dark ring-1 ring-brand-teal/20">
               <RoleIcon className="h-2.5 w-2.5" />
               {roleMeta.label}
             </span>

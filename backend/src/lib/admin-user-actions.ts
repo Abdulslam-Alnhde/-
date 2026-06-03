@@ -17,7 +17,7 @@ export function canAdminPanelAction(
   action: AdminUserAction
 ): boolean {
   const keys = user.permissionKeys ?? [];
-  if (user.role === "ADMIN" && keys.length === 0) return true;
+  if (user.role === "ADMIN") return true;
   if (keys.includes("MANAGE_USERS")) return true;
   switch (action) {
     case "list":

@@ -258,6 +258,13 @@ function CommitteeQueuePageContent() {
                 id: i + 1,
                 label: stableLabelForIndex(i),
                 text: q.content,
+                questionType: q.type === "OBJECTIVE" ? "OBJECTIVE" : "RUBRIC",
+                modelAnswer: q.modelAnswer || "",
+                questionMaxPoints: typeof q.points === "number" ? q.points : undefined,
+                keyPoints: Array.isArray(q.keyPoints)
+                  ? q.keyPoints.map((kp: any) => kp.point || "").filter(Boolean)
+                  : [],
+                teacherNote: q.teacherNote || "",
               }))
             )
           );
@@ -276,6 +283,14 @@ function CommitteeQueuePageContent() {
           alert(data.error || "فشل استخراج ورقة الطالب.");
         } else if (!Array.isArray(data)) {
           alert("استجابة غير صالحة من الخادم.");
+        } else if (
+          data.length > 0 &&
+          data.every((item: any) => !String(item?.studentAnswer || "").trim())
+        ) {
+          setExtractedStudentAnswers([]);
+          alert(
+            "لم يتم العثور على إجابات طالب واضحة في الملف المرفوع. تأكد أنك رفعت ورقة الطالب التي تحتوي على الإجابات، أو ارفع نسخة أوضح."
+          );
         } else {
           const enriched = data.map((a: any) => {
             const qNumInput = String(a.questionNumber).trim();
@@ -326,11 +341,32 @@ function CommitteeQueuePageContent() {
       const qData = extractedStudentAnswers.find(
         (a: any) => a.questionNumber === qNum
       );
+      const qIndex = qNum - 1;
+      const examQ = selectedExam?.questions?.[qIndex];
       const formData = new FormData();
       formData.append("file", studentFile);
       formData.append("targetQuestionNumber", qNum.toString());
       formData.append("targetQuestionText", qData?.questionText || "");
       formData.append("targetQuestionLabel", qData?.displayLabel || "");
+      if (examQ && selectedExam?.questions) {
+        formData.append(
+          "examQuestions",
+          JSON.stringify(
+            selectedExam.questions.map((q: any, i: number) => ({
+              id: i + 1,
+              label: stableLabelForIndex(i),
+              text: q.content,
+              questionType: q.type === "OBJECTIVE" ? "OBJECTIVE" : "RUBRIC",
+              modelAnswer: q.modelAnswer || "",
+              questionMaxPoints: typeof q.points === "number" ? q.points : undefined,
+              keyPoints: Array.isArray(q.keyPoints)
+                ? q.keyPoints.map((kp: any) => kp.point || "").filter(Boolean)
+                : [],
+              teacherNote: q.teacherNote || "",
+            }))
+          )
+        );
+      }
       const res = await fetch("/api/services/extract-student", {
         method: "POST",
         body: formData,

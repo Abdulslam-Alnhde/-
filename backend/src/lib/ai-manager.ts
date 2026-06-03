@@ -40,12 +40,7 @@ const SERVICE_FALLBACK_PREFIX: Record<AIService, string | undefined> = {
   grading: undefined,
 };
 
-const DEFAULT_MODELS_BY_PROVIDER: Record<string, string[]> = {
-  gemini: ["gemini-2.0-flash"],
-  openai: ["gpt-4o-mini"],
-  xai: ["gemini-2.0-flash"],
-  custom: ["gemini-2.0-flash"],
-};
+const DEFAULT_GEMINI_MODELS = ["gemini-2.0-flash"];
 
 function pickEnv(...keys: string[]): string {
   for (const k of keys) {
@@ -117,9 +112,7 @@ export class AIManager {
   }
 
   public getAvailableKeysCount(): number {
-    const key = String(
-      process.env.GEMINI_API_KEY || process.env.XAI_API_KEY || process.env.AI_API_KEY || ""
-    ).trim();
+    const key = String(process.env.GEMINI_API_KEY || "").trim();
     return key ? 1 : 0;
   }
 
@@ -155,22 +148,13 @@ export class AIManager {
     const globalModels = parseModelList(process.env.AI_MODELS);
     if (globalModels.length > 0) return globalModels;
 
-    // Ø§ÙØªØ±Ø§Ø¶Ø§Øª Ù…Ø¨Ù†ÙŠØ© Ø¹Ù„Ù‰ Ù†ÙˆØ¹ Ø§Ù„Ù…Ø²ÙˆÙ‘Ø¯
-    const provider = this.getServiceProviderKind(service);
-    return DEFAULT_MODELS_BY_PROVIDER[provider] || ["gemini-2.0-flash"];
+    return DEFAULT_GEMINI_MODELS;
   }
 
   /** Ù†ÙˆØ¹ Ø§Ù„Ù…Ø²ÙˆÙ‘Ø¯ Ø§Ù„Ù…Ø®ØªØ§Ø± Ù„Ù„Ø®Ø¯Ù…Ø© (Ù„Ù„Ø£ØºØ±Ø§Ø¶ Ø§Ù„ØªØ´Ø®ÙŠØµÙŠØ© ÙˆØ§Ù„Ø§ÙØªØ±Ø§Ø¶Ø§Øª). */
   public getServiceProviderKind(service: AIService): string {
-    const envPrefix = SERVICE_ENV_PREFIX[service];
-    const fallbackPrefix = SERVICE_FALLBACK_PREFIX[service];
-    const explicit =
-      pickEnv(`${envPrefix}_PROVIDER`) ||
-      (fallbackPrefix ? pickEnv(`${fallbackPrefix}_PROVIDER`) : "");
-    if (explicit) return explicit.toLowerCase();
-
-    // Ø§Ù„ØªØµØ­ÙŠØ­ â‡’ Ù…Ø­Ù„ÙŠ Ø§ÙØªØ±Ø§Ø¶ÙŠØ§Ù‹
-    return (pickEnv("AI_PROVIDER") || "gemini").toLowerCase();
+    void service;
+    return "gemini";
   }
 
   /**

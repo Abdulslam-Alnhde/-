@@ -20,6 +20,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "منصة إدارة الامتحانات الجامعية",
   description: "نظام متكامل لإدارة وتقييم الامتحانات الجامعية.",
+  icons: {
+    icon: "/images/alarab-university-logo.png",
+    apple: "/images/alarab-university-logo.png",
+  },
 };
 
 export default function RootLayout({

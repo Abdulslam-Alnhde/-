@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/common/ui/button";
 import Link from "next/link";
 import { AlarabLogo } from "@/common/components/brand/AlarabLogo";
@@ -15,6 +15,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,15 +104,19 @@ function LoginForm() {
 
         {/* Top: brand */}
         <div className="relative">
-          <Link href="/" className="group inline-flex items-center gap-3">
-            <div className="rounded-2xl bg-gradient-to-br from-brand-teal to-brand-teal-dark p-1 shadow-md shadow-brand-teal/30 transition group-hover:scale-105">
-              <div className="rounded-[14px] bg-white p-1.5">
-                <AlarabLogo size="sm" priority />
+          <Link href="/" className="group inline-flex items-center gap-5">
+            <div className="rounded-3xl bg-gradient-to-br from-brand-teal to-brand-teal-dark p-1.5 shadow-lg shadow-brand-teal/30 transition group-hover:scale-105">
+              <div className="rounded-[20px] bg-white p-3">
+                <AlarabLogo
+                  size="sm"
+                  priority
+                  className="[&_img]:max-h-20 sm:[&_img]:max-h-24"
+                />
               </div>
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-base font-bold text-brand-teal-dark">جامعة العرب</span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-orange">
+              <span className="text-xl font-black text-brand-teal-dark">جامعة العرب</span>
+              <span className="text-xs font-black uppercase tracking-[0.28em] text-brand-orange">
                 Exams Platform
               </span>
             </div>
@@ -226,14 +231,26 @@ function LoginForm() {
                 <div className="relative">
                   <Lock className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-brand-teal/70" />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-2xl border-2 border-border bg-white py-3.5 pl-4 pr-12 text-sm font-semibold text-foreground shadow-sm outline-none transition focus:border-brand-teal focus:bg-brand-teal-light/30 focus:ring-4 focus:ring-brand-teal/15"
+                    className="w-full rounded-2xl border-2 border-border bg-white py-3.5 pl-12 pr-12 text-sm font-semibold text-foreground shadow-sm outline-none transition focus:border-brand-teal focus:bg-brand-teal-light/30 focus:ring-4 focus:ring-brand-teal/15"
                     placeholder="••••••••"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-brand-teal/70 transition hover:bg-brand-teal-light hover:text-brand-teal-dark focus:outline-none focus:ring-2 focus:ring-brand-teal/30"
+                    aria-label={showPassword ? "إخفاء كلمة المرور" : "عرض كلمة المرور"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
                 </div>
               </div>
 

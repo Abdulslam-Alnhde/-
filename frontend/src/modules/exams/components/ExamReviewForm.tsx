@@ -14,6 +14,7 @@ import {
 import { Button } from "@/common/ui/button";
 import { motion } from "@/common/lib/motion";
 import {
+  ArrowRight,
   Save,
   Plus,
   Trash2,
@@ -219,6 +220,17 @@ export function ExamReviewForm() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 gap-2 rounded-2xl border-brand-teal/30 bg-white px-4 text-xs font-black text-brand-teal-dark shadow-sm shadow-brand-teal/10 transition hover:border-brand-teal hover:bg-brand-teal-light hover:text-brand-teal-dark"
+            onClick={() => setStep(2)}
+            disabled={isSubmitting}
+          >
+            <ArrowRight className="h-4 w-4" />
+            العودة لرفع الملفات
+          </Button>
           <Button
             type="button"
             variant="outline"

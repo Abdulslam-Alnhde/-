@@ -18,14 +18,17 @@ function parseExamDate(description: string | null | undefined): string {
 export function CreateExamEditLoader() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
-  const { setExamDetails, setExtractedQuestions, setStep, setEditingExamId } =
+  const { setExamDetails, setExtractedQuestions, setStep, setEditingExamId, reset } =
     useExamStore();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!editId) {
-      setEditingExamId(null);
+      // بداية "إنشاء اختبار جديد": نُفرّغ أي حالة متبقية من اختبار/جلسة سابقة
+      // (أسئلة، إجابات طلاب، هيكل، خطوة) حتى لا تتسرب بيانات قديمة وتتصادم
+      // مع الاختبار الحالي عند التنقل دون إعادة تحميل الصفحة.
+      reset();
       return;
     }
 
@@ -85,15 +88,7 @@ export function CreateExamEditLoader() {
     return () => {
       cancelled = true;
     };
-  }, [editId, setEditingExamId, setExamDetails, setExtractedQuestions, setStep]);
-
-  // Leaving edit mode: optional reset when user navigates away from ?edit=
-  useEffect(() => {
-    if (!editId) return;
-    return () => {
-      // no-op: keep store until unmount of wizard
-    };
-  }, [editId]);
+  }, [editId, reset, setEditingExamId, setExamDetails, setExtractedQuestions, setStep]);
 
   if (!editId) return null;
 

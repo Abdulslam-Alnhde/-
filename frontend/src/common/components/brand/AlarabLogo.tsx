@@ -14,7 +14,7 @@ const H = 501;
 const sizeClass = {
   sm: "max-h-9 sm:max-h-10",
   md: "max-h-28 sm:max-h-32",
-  lg: "max-h-40 sm:max-h-48 md:max-h-[13rem]",
+  lg: "max-h-56 sm:max-h-64 md:max-h-[18rem]",
 };
 
 /**
@@ -37,7 +37,7 @@ export function AlarabLogo({
       )}
     >
       <Image
-        src="/images/alarab-university-logo.svg"
+        src="/images/alarab-university-logo.png"
         alt="جامعة العرب — Alarab University"
         width={W}
         height={H}

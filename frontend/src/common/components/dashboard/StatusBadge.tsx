@@ -20,7 +20,7 @@ const STATUS_MAP: Record<
   PENDING_APPROVAL: {
     label: "قيد المراجعة",
     icon: Clock,
-    cls: "border-brand-orange/40 bg-brand-orange/10 text-brand-orange-dark",
+    cls: "border-brand-teal/30 bg-brand-teal-light text-brand-teal-dark",
   },
   REJECTED: {
     label: "مرفوض",

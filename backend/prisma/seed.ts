@@ -1,7 +1,6 @@
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-
-const prisma = new PrismaClient();
+import { prisma } from "../src/lib/prisma";
+import { ALL_PERMISSION_KEYS } from "../src/lib/permissions";
 
 const COLLEGES = [
   "كلية علوم الحاسب والمعلومات",
@@ -75,7 +74,7 @@ async function main() {
       jobTitle: process.env.ADMIN_JOB_TITLE || "مشرف النظام",
       phone: process.env.ADMIN_PHONE || null,
       profileLocked: false,
-      permissionKeys: ["MANAGE_USERS"],
+      permissionKeys: [...ALL_PERMISSION_KEYS],
     },
   });
 

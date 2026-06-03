@@ -5,21 +5,31 @@
 
 // ─── 1) Teacher exam extraction ───────────────────────────────────────
 
-export const TEACHER_EXTRACT_SYSTEM_INSTRUCTION = `You extract university exam questions into structured JSON for later grading.
+export const TEACHER_EXTRACT_SYSTEM_INSTRUCTION = `You are a verbatim exam extractor. You copy text exactly as printed — you NEVER translate, paraphrase, summarize, or generate content.
 
 Return JSON only.
 
-Rules:
-- Extract 100% of visible questions and sub-questions.
-- Keep question text and model answers in the exam language.
-- Do NOT translate between Arabic and English. Preserve Arabic wording, punctuation, and line breaks as much as possible.
-- questionType must be "OBJECTIVE" for multiple-choice, true/false, matching, fill-in-the-blank, and direct short-answer questions.
-- Objective questions must use keyPoints: [] and only set questionMaxPoints.
-- questionType must be "RUBRIC" for explanation, essay, definition, derivation, and multi-step questions.
-- For rubric questions only, keyPoints must be in the SAME language as the model answer (Arabic if the answer is Arabic). Derive 2–8 concise grading criteria from the model answer only; do not invent facts.
-- Read numbering exactly as printed. Use groupNumber for the major question and subIndex for each sub-question.
-- If the paper says "Explain any N of the following", "terms", "concepts", or "definitions", emit each listed item as its own sub-question under the same groupNumber.
+LANGUAGE RULE (HIGHEST PRIORITY):
+- Keep EVERY field (title, question, modelAnswer, keyPoints) in the EXACT language printed in the exam file.
+- If the exam is in English, ALL output must be in English.
+- If the exam is in Arabic, ALL output must be in Arabic.
+- NEVER translate between languages. NEVER mix languages unless the original exam does.
+
+EXTRACTION RULES:
+- Copy question text VERBATIM from the exam paper — do not rephrase.
+- Copy model answers VERBATIM from the answer key — do not rephrase, expand, or generate.
+- If no model answer exists in the document for a question, set modelAnswer to "" (empty string).
+- questionType "OBJECTIVE": multiple-choice, true/false, matching, fill-in-the-blank, short-answer. Use keyPoints: [].
+- questionType "RUBRIC": essay, explanation, definition, derivation, multi-step. Derive keyPoints from the verbatim model answer only.
+- Read numbering exactly as printed. groupNumber = major question, subIndex = sub-question.
 - The sum of defaultGrade inside one rubric question must equal questionMaxPoints when possible.
+
+ZERO HALLUCINATION:
+- Extract ONLY what is EXPLICITLY PRINTED in the document.
+- NEVER invent, fabricate, or generate questions or answers from your knowledge.
+- NEVER add sub-questions that do not exist in the document.
+- If a question has 0 sub-parts declared, emit exactly 1 JSON object for it — do NOT split it.
+- If you cannot read text clearly, use "" — NEVER guess.
 - Do not add commentary, markdown, or prose outside JSON.`;
 
 /**
@@ -82,9 +92,11 @@ CRITICAL RULES:
 1. Each main question on the paper = a unique groupNumber (1, 2, 3 …).
 2. Sub-parts within a main question share the SAME groupNumber but have sequential subIndex values (1, 2, 3 …).
 3. You MUST produce exactly ${questions.length} distinct groupNumber values in your output.
-4. Scan ALL ${pages || ""} pages — do NOT stop after the first question.
-5. If your output does not have ${questions.length} distinct groupNumbers, re-read the paper from the beginning.
-6. Never invent questions. Never drop questions that are visibly present.`;
+4. You MUST produce EXACTLY the number of sub-parts specified for each question above. If Q1 says "10 sub-part(s)", emit exactly 10 JSON objects with groupNumber=1. Do NOT split or merge beyond what is declared.
+5. Scan ALL ${pages || ""} pages — do NOT stop after the first question.
+6. If your output does not have ${questions.length} distinct groupNumbers, re-read the paper from the beginning.
+7. Never invent questions. Never drop questions that are visibly present.
+8. The total number of JSON question objects in your output must be exactly ${subParts + questions.filter(q => !q.subPartCount).length}. Count before responding.`;
 }
 
 export function buildTeacherUserTaskPrompt(structureHint?: string): string {
@@ -111,13 +123,13 @@ Required JSON shape:
 }
 
 Important:
-- Preserve the original language of the exam (Arabic stays Arabic). Do NOT translate title/question/modelAnswer.
+- KEEP THE ORIGINAL LANGUAGE. If the exam is in English, output English. If Arabic, output Arabic. NEVER translate.
+- Copy question text and model answers VERBATIM from the document — do not rephrase or generate.
 - If a question is objective, use questionType: "OBJECTIVE" and keyPoints: [].
-- For RUBRIC questions, provide 2+ keyPoints in the same language as modelAnswer, summing defaultGrade to questionMaxPoints when possible.
-- If a major question contains multiple listed terms or items, split them into separate sub-questions.
-- Read numbering exactly from the paper.
-- Never invent questions or answers not present in the uploaded exam file.
-- If a field is unknown, return an empty string instead of fabrication.
+- For RUBRIC questions, provide 2+ keyPoints derived from the verbatim model answer, summing defaultGrade to questionMaxPoints.
+- If a question has 0 sub-parts in the structure, emit exactly 1 JSON object — do NOT split it into multiple.
+- If no model answer is in the document, set modelAnswer to "".
+- NEVER invent questions or answers. Extract ONLY what is printed in the file.
 - Return JSON only.${hint}`;
 }
 
@@ -167,14 +179,23 @@ export const TEACHER_FILL_SYSTEM_INSTRUCTION =
 // ─── 2) Student answer extraction (handwriting OCR) ───────────────────
 
 // تعليمات خاصة باستخراج إجابات الطالب لضمان الدقة العالية
-export const STUDENT_EXTRACT_SYSTEM_INSTRUCTION = `You are a professional literal transcriber. Your goal is to extract student handwritten answers with 100% fidelity.
+export const STUDENT_EXTRACT_SYSTEM_INSTRUCTION = `You are an elite OCR specialist for student exam papers. Your single mission: find and transcribe EVERY visible student answer on the page — especially HANDWRITTEN answers — with 100% fidelity.
+
+PRIMARY DIRECTIVE — HANDWRITING IS THE MAIN TARGET:
+Most student answers on physical exam papers are handwritten. Your top priority is to detect, read, and transcribe handwriting even when it is faint, messy, slanted, cursive, or partially smudged. NEVER skip handwriting because it looks unclear.
 
 STRICT RULES:
-1. VERBATIM ONLY: Transcribe exactly what is written. Do NOT improve grammar, do NOT summarize, and do NOT fix spelling.
-2. NO HALLUCINATION: If a word is illegible, write [?]. Do NOT guess based on context.
-3. PRESERVE STRUCTURE: Keep the sentences in the same order. If the student repeats a word, transcribe it twice.
-4. LANGUAGE: Keep Arabic in Arabic and English in English. Do NOT translate.
-5. NO COMMENTARY: Return ONLY the JSON object.`;
+1. EXAM AWARENESS: You may receive the printed exam questions and model-answer hints. Use them ONLY to LOCATE the student's answer region — NEVER let them influence WHAT you transcribe. Transcribe only what the student physically wrote on the paper.
+2. VERBATIM ONLY: Transcribe exactly what is written. Do NOT improve grammar, do NOT summarize, do NOT fix spelling, do NOT reorder words.
+3. NO HALLUCINATION: If a word is illegible, write [?]. NEVER guess from context. NEVER copy from the model answer. NEVER invent text the student did not write.
+4. PRESERVE STRUCTURE: Keep sentences in the original order. Preserve line breaks. Keep math symbols (∑, ∫, √, π, ², ³, ±, ≤, ≥, ≠, →) and equations exactly.
+5. LANGUAGE FIDELITY: Keep Arabic in Arabic and English in English. NEVER translate. NEVER mix languages unless the student did.
+6. NO COMMENTARY: Return ONLY the JSON object. No markdown, no preamble, no notes.
+7. STUDENT RESPONSE TYPES: Handwritten text, typed text, printed-in-field responses, circled options, ticked boxes, underlined choices, highlighted selections, ink marks, pencil marks — all are valid student answers.
+8. QUESTION TYPE AWARENESS:
+   - OBJECTIVE (MCQ, true/false, fill-blank, matching): Answer is usually a short letter (A/B/C/D, أ/ب/ج/د), single word, short phrase, circled option, ticked box, or underline. Capture the chosen option exactly.
+   - RUBRIC (essay, explanation, derivation, definition, multi-step): Answer can span multiple sentences, paragraphs, or pages. Transcribe EVERY word, line by line, exhaustively. Do NOT stop after one line.
+9. NEVER LEAK MODEL ANSWER: The studentAnswer field must contain ONLY what the student wrote. If the answer area is genuinely empty, return "" — do NOT fill it with the model answer or printed exam text.`;
 
 export const STUDENT_VERBATIM_RULES = `
 LANGUAGE FIDELITY (mandatory):
@@ -185,74 +206,253 @@ LANGUAGE FIDELITY (mandatory):
 - Mixed Arabic+English on paper: copy exactly. English-only on paper: English-only in studentAnswer.
 - Preserve readable spacing and line breaks from the source when possible.
 - Never glue Arabic letters or words together during transcription.
-- If a part is unreadable, leave it blank rather than guessing.`;
+- If a part is unreadable, leave it blank rather than guessing.
+- NEVER copy text from the model answer passed in the prompt into the student answer. These are COMPLETELY separate.
+- If the uploaded student sheet contains typed or printed responses in answer areas, extract them as student answers.
+- If extracted PDF text is provided with the images, use it as an OCR aid. It may contain the student's typed answers more clearly than the page image.`;
 
 const STUDENT_HANDWRITING_RULES = `
-HANDWRITING (mandatory):
-- Handwritten answers are valid answers. Do NOT ignore handwriting even if faint or messy.
-- Look for handwritten content near the question area AND anywhere on the page where the student continued the answer.
-- Preserve math symbols, arrows, crossed-out text, and line breaks.
-- If the student wrote something but a word is unclear, transcribe what is visible and keep unclear fragments as-is (do NOT guess missing words).`;
+HANDWRITING DETECTION (mandatory — this is the most critical section):
+- Handwriting is the PRIMARY answer type on physical exam papers. Treat the search for handwriting as exhaustive.
+- ALL of these count as a student handwritten answer: pen strokes (any color), pencil strokes (light or dark), mixed pen+pencil, cursive script, print writing, block letters, numerals, equations, diagrams with labels, arrows.
+- Faint or messy handwriting STILL COUNTS. If you can see ink/pencil traces forming letters or symbols, transcribe them. Do NOT mark them as blank just because they are hard to read.
+- SCAN THE ENTIRE PAGE systematically — do NOT stop at the first answer area you find:
+  • Top-to-bottom for ltr, right-to-left for Arabic.
+  • Below the printed question on dedicated answer lines or blank space.
+  • Inside answer boxes, brackets, dashed lines, or empty rectangles.
+  • In MARGINS (left, right, top, bottom) — students often continue answers there.
+  • At the END of the page — students may write the conclusion at the bottom.
+  • On the BACK or NEXT page if continuation arrows like "→", "PTO", "تابع", "see back" appear.
+- ARABIC HANDWRITING SPECIFICS:
+  • Arabic letters change shape based on position (initial, medial, final, isolated). Read letters in their connected form.
+  • Pay attention to dots (نقاط) — they distinguish letters (ب ت ث ن ي).
+  • Diacritics (تشكيل) may or may not be present; read the base letters.
+  • Common student abbreviations like "إلخ", "أو", "ف" are valid.
+  • Do NOT glue Arabic words together — preserve word boundaries.
+- ENGLISH HANDWRITING SPECIFICS:
+  • Distinguish between similar letters: a/o, n/h, u/v, i/l, t/f.
+  • Preserve case as written (variable names, code identifiers must keep exact case).
+- For messy handwriting: read each word in the context of surrounding words. If a single character is unclear but the whole word is recognizable, transcribe the recognizable word. Use [?] only for clearly unreadable fragments, not for entire missing answers.
+- For long answers spanning multiple lines: transcribe LINE BY LINE. Every line. Do not summarize. Do not stop after the first 2-3 lines.
+- If the student crossed out text and rewrote it, transcribe only the FINAL (uncrossed) version. If both versions are equally readable, prefer the rewritten one.
+- If the student wrote in stages (initial answer + correction), transcribe the corrected/final state.
+- IMPORTANT: Some students write very small, very lightly, or in pencil. Mentally zoom into all empty-looking areas of the page to verify they are truly blank before declaring the answer empty.`;
 
 const STUDENT_INK_RULES = `
-INK / CORRECTIONS (mandatory):
-- Treat clearly red-ink markings as teacher annotations and exclude them from studentAnswer when they are obviously corrections (ticks, crosses, scoring marks, "correct/wrong" symbols).
-- If the student themselves wrote in red ink as part of their answer, include it.
-- Preserve code, formulas, identifiers, and variable names exactly (case-sensitive). Do NOT rename variables, do NOT reformat code.`;
+ANSWER FORMATS / TEACHER MARKS / TYPED ANSWERS (mandatory):
+- TEACHER MARKS TO EXCLUDE: Red-ink ticks (✓), crosses (✗), score numbers like "5/10" or "4 من 5", grade circles, "correct/wrong" stamps, underlines drawn by teacher to mark errors. These are NOT student answers.
+- STUDENT IN RED INK: If the student themselves wrote the entire answer in red pen (some students do), include it. Use context to decide: a full sentence in red is likely the student; isolated ticks/numbers are likely the teacher.
+- TYPED / PRINTED FIELDS: If the uploaded sheet contains typed responses (e.g., student filled a digital form then printed), extract those exactly.
+- CIRCLED / TICKED / UNDERLINED / HIGHLIGHTED OPTIONS (objective questions): Capture the chosen option exactly. Examples:
+  • Circle around "B" → studentAnswer: "B"
+  • Tick next to "True" → studentAnswer: "True"
+  • Underline under "Photosynthesis" → studentAnswer: "Photosynthesis" (or the letter+text if visible)
+  • Arrow pointing to option C → studentAnswer: "C"
+- For matching questions: capture the pairings the student drew (e.g., "1→C, 2→A, 3→B").
+- For fill-in-the-blank: capture exactly what the student wrote in the blank.
+- Preserve code, formulas, identifiers, and variable names exactly (case-sensitive). Do NOT rename variables, do NOT reformat code, do NOT add semicolons or fix syntax errors.
+- Distinguish between: (a) printed exam question/instructions, (b) STUDENT responses, (c) teacher corrections. Only transcribe (b).`;
 
 export function makeStudentExtractionRules(): string {
   return [STUDENT_VERBATIM_RULES, STUDENT_HANDWRITING_RULES, STUDENT_INK_RULES].join("\n");
+}
+
+/**
+ * Exam context data passed to student extraction prompts.
+ * This helps the AI understand what each question expects so it can
+ * locate the answer region more accurately.
+ */
+export type StudentExamContext = {
+  questionType?: "OBJECTIVE" | "RUBRIC";
+  modelAnswer?: string;
+  questionMaxPoints?: number;
+  keyPoints?: string[];
+  teacherNote?: string;
+};
+
+function buildExamContextBlock(
+  questions: Array<{
+    id: number;
+    label?: string;
+    text?: string;
+    examContext?: StudentExamContext;
+  }>
+): string {
+  if (!questions.some((q) => q.examContext)) return "";
+
+  const lines = questions.map((q) => {
+    const ctx = q.examContext;
+    if (!ctx) return `- Q${q.label || q.id}: ${q.text || ""}`;
+
+    const type = ctx.questionType === "OBJECTIVE" ? "موضوعي (objective)" : "مقالي (rubric)";
+    const points = ctx.questionMaxPoints ? ` [${ctx.questionMaxPoints} درجة]` : "";
+    const answerHint = ctx.modelAnswer
+      ? `\n    Expected answer type: ${ctx.questionType === "OBJECTIVE" ? "Short (letter/word/phrase)" : "Long (paragraph/essay)"}`
+      : "";
+    const answerPreview = ctx.modelAnswer
+      ? `\n    Model answer preview (for locating answer region ONLY, never copy): "${ctx.modelAnswer.slice(0, 80)}${ctx.modelAnswer.length > 80 ? "..." : ""}"`
+      : "";
+
+    return `- Q${q.label || q.id}: ${q.text || ""}\n    Type: ${type}${points}${answerHint}${answerPreview}`;
+  });
+
+  return `\nEXAM STRUCTURE (use this to understand what each question expects — NEVER copy model answers into student answers):
+${lines.join("\n")}`;
 }
 
 export function buildStudentSinglePrompt(params: {
   questionNumber: number;
   questionText?: string;
   questionLabel?: string;
+  examContext?: StudentExamContext;
 }): string {
-  const { questionNumber, questionText, questionLabel } = params;
+  const { questionNumber, questionText, questionLabel, examContext } = params;
   const resolvedQuestionText = questionText || "";
 
+  const typeHint = examContext?.questionType
+    ? `\nQuestion Type: ${examContext.questionType === "OBJECTIVE" ? "OBJECTIVE (expect short answer: letter, word, or short phrase)" : "RUBRIC (expect long answer: sentences, paragraphs, explanations)"}`
+    : "";
+
+  const answerHint = examContext?.modelAnswer
+    ? `\nModel Answer Preview (use ONLY to locate the answer region on the paper — NEVER copy this into studentAnswer): "${examContext.modelAnswer.slice(0, 120)}${examContext.modelAnswer.length > 120 ? "..." : ""}"`
+    : "";
+
+  const pointsHint = examContext?.questionMaxPoints
+    ? `\nQuestion Points: ${examContext.questionMaxPoints} (higher points = expect longer answer)`
+    : "";
+
   return `${STUDENT_EXTRACT_SYSTEM_INSTRUCTION}
+${makeStudentExtractionRules()}
 
-TASK:
-Extract the student's answer for this specific question:
-Question Number: ${questionNumber} ${questionLabel ? `(${questionLabel})` : ""}
-Question Text: "${resolvedQuestionText}"
+TASK (single-question rescue mode):
+A previous batch attempt may have missed the answer for this specific question. Re-scan the ENTIRE uploaded paper carefully — including all pages, margins, and continuation areas — and extract the student's handwritten or typed answer.
 
-REQUIRED JSON FORMAT:
+Question Number: ${questionNumber} ${questionLabel ? `(displayed as: ${questionLabel})` : ""}
+Question Text (printed on the exam — do NOT copy this into studentAnswer): "${resolvedQuestionText}"${typeHint}${pointsHint}${answerHint}
+
+EXTRACTION STRATEGY (be thorough — this is a second-chance pass):
+1. Locate question ${questionLabel || questionNumber} on the page. The label may appear as "${questionLabel || questionNumber}", "Q${questionNumber}", "السؤال ${questionNumber}", "${questionNumber})", "${questionNumber}-", or similar variations.
+2. Search the answer area DIRECTLY below/beside the question for handwriting (any color ink, pencil).
+3. If that area looks empty, scan systematically:
+   • All four margins of the same page (top, bottom, left, right).
+   • Other pages of the document.
+   • Continuation arrows (→, "see back", "PTO", "تابع في الخلف").
+   • Separate answer sheets if attached.
+4. HANDWRITING IS THE TARGET: faint pencil, messy cursive, slanted writing, mixed pen+pencil — all count. Do NOT skip handwriting because it looks unclear.
+5. For OBJECTIVE: identify the circled/ticked/underlined/marked option (A/B/C/D, أ/ب/ج/د, True/False, etc.).
+6. For RUBRIC: transcribe EVERY line of handwriting for this question. All sentences. All paragraphs. Word by word.
+7. Use any extracted PDF text context as an OCR aid if provided alongside the images.
+8. Only return studentAnswer: "" after you are CERTAIN no handwriting exists anywhere on any attached page for this question.
+
+REQUIRED JSON FORMAT (return ONLY this object):
 {
   "questionNumber": ${questionNumber},
   "questionText": "${resolvedQuestionText}",
-  "studentAnswer": "The literal transcription of the student's handwritten answer goes here. Be exhaustive and do not skip any sentences."
+  "studentAnswer": "Literal verbatim transcription of the student's answer. Include every visible sentence."
 }
 
-FINAL REMINDER: If the student wrote a long paragraph, you MUST transcribe every single word of it.`;
+FINAL REMINDER: If the student wrote a long handwritten paragraph, you MUST transcribe every single word of it. NEVER substitute the model answer for what the student wrote. Empty studentAnswer is only acceptable when the answer area is genuinely blank across all attached pages.`;
 }
 
 export function buildStudentBatchPrompt(
-  batch: Array<{ id: number; label?: string; text?: string }>
+  batch: Array<{ id: number; label?: string; text?: string; examContext?: StudentExamContext }>
 ): string {
+  const examContext = buildExamContextBlock(batch);
+
   const questionsList = batch
-    .map((q) => `- Q${q.id}: ${q.text || "No text provided"}`)
+    .map((q) => {
+      const type = q.examContext?.questionType === "OBJECTIVE" ? " [موضوعي]" : q.examContext?.questionType === "RUBRIC" ? " [مقالي]" : "";
+      return `- Q${q.label || q.id}${type}: ${q.text || "No text provided"}`;
+    })
     .join("\n");
 
   return `${STUDENT_EXTRACT_SYSTEM_INSTRUCTION}
+${makeStudentExtractionRules()}
+${examContext}
 
 TASK:
-Identify and transcribe the student's answers for the following ${batch.length} questions from the image:
+Identify and transcribe the student's HANDWRITTEN (or typed) answers for the following ${batch.length} question(s) from the uploaded exam paper.
+
+QUESTIONS TO EXTRACT:
 ${questionsList}
+
+EXTRACTION STRATEGY (follow this in order — do not skip steps):
+1. SCAN ALL ATTACHED PAGES/IMAGES systematically. Multi-page papers usually have answers spread across pages. Do NOT assume answers are only on the first page.
+2. For each question:
+   a. Locate the printed question on a page using its number/label.
+   b. Search the answer area DIRECTLY below/beside it for handwriting.
+   c. If empty, scan the rest of the page (margins, top, bottom, left, right) for the student's answer.
+   d. If still empty, check continuation arrows (→, "see back", "تابع") and follow them to the next page.
+   e. Check the back of the page or a separate answer sheet if attached.
+3. HANDWRITING IS PRIMARY: Most answers are handwritten. Even faint pencil or messy ink counts. Transcribe what you can see, character by character.
+4. OBJECTIVE questions: Look for circled, ticked, underlined, highlighted, or marked options. The answer is the chosen option (letter and/or text).
+5. RUBRIC questions: Transcribe ALL handwritten lines for that question. Every sentence. Every word. Do NOT summarize. Do NOT stop after the first line.
+6. MARGINS AND CONTINUATIONS: Always check the page margins and any continuation marks. Long answers often spill there.
+7. PROOF BEFORE BLANK: A blank-looking printed answer box is NOT proof of no answer. Before setting studentAnswer to "", verify by scanning:
+   - The full current page (all corners and margins).
+   - All other attached pages.
+   - The extracted PDF text context (if provided).
+   Only return "" when you are certain no handwriting exists for that question anywhere.
+8. NEVER substitute the model answer or printed question text for the student's response.
 
 REQUIRED JSON FORMAT:
 {
   "answers": [
     {
       "questionNumber": "ID of the question",
-      "studentAnswer": "Literal, exhaustive transcription"
+      "studentAnswer": "Literal verbatim transcription of the student's handwritten/typed answer"
     }
   ]
 }
 
-CRITICAL: If a question is answered on the paper but missing from your output, the system fails. Ensure every visible sentence is captured.`;
+CRITICAL RULES:
+- Output ONE entry per listed question. Even unanswered questions must be in the output with studentAnswer: "".
+- If a question is answered on the paper but missing from your output, the system FAILS the user. Double-check every question.
+- For long handwritten paragraphs: transcribe ALL of it. Truncating loses critical content the student will be graded on.
+- NEVER copy model answers from the prompt context into studentAnswer — only transcribe what is visible on the uploaded paper.
+- Use the numeric Q id (e.g., 1, 2, 3) for questionNumber, matching the questions listed above.`;
+}
+
+export function buildStudentLenientBatchPrompt(
+  batch: Array<{ id: number; label?: string; text?: string; examContext?: StudentExamContext }>
+): string {
+  const questionsList = batch
+    .map((q) => `- Q${q.label || q.id}: ${q.text || "No text provided"}`)
+    .join("\n");
+
+  return `${STUDENT_EXTRACT_SYSTEM_INSTRUCTION}
+${makeStudentExtractionRules()}
+
+RECOVERY MODE:
+The previous strict extraction found no answers. Treat the uploaded file as the student's submitted paper and extract ANY visible response-like content for each listed question.
+
+Use every available source:
+- Rendered page images.
+- Extracted PDF text context, if present.
+
+What counts as a student answer in this recovery mode:
+- Handwritten text near, below, beside, or after the question.
+- Typed or printed text in answer areas.
+- Text after labels such as Answer, Ans, Solution, Response, Final answer, or Arabic equivalents.
+- Circled, ticked, underlined, highlighted, or selected options.
+- Filled blanks, true/false marks, letters such as A/B/C/D, or short phrases.
+- If the uploaded file is a solved paper or answer-key-like student submission, extract the printed answer text as the student's visible answer.
+
+Do NOT copy from the exam context or model answer in the prompt. Only use text visible in the uploaded file or extracted from that file.
+Ignore the printed question wording itself unless it is clearly part of the student's response.
+
+QUESTIONS TO MAP:
+${questionsList}
+
+Return JSON only:
+{
+  "answers": [
+    {
+      "questionNumber": "ID of the question",
+      "studentAnswer": "Best transcription of the visible answer for this question, or empty string only if truly no answer is visible anywhere"
+    }
+  ]
+}`;
 }
 
 export function buildStudentJsonRepairPrompt(rawText: string): string {

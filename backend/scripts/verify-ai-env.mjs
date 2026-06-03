@@ -1,5 +1,5 @@
 /**
- * Validates AI env for the backend. Loads backend/.env.
+ * Validates Google Gemini env for the backend.
  * Run: npm --prefix backend run verify-ai
  */
 import fs from "fs";
@@ -7,10 +7,14 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.join(__dirname, "..", ".env");
+const envCandidates = [
+  path.join(__dirname, "..", ".env"),
+  path.join(__dirname, "..", "..", ".env"),
+];
 
-if (!fs.existsSync(envPath)) {
-  console.error("No .env file found in backend:", envPath);
+const envPath = envCandidates.find((candidate) => fs.existsSync(candidate));
+if (!envPath) {
+  console.error("No .env file found for the backend.");
   process.exit(1);
 }
 
@@ -31,47 +35,17 @@ for (const line of raw.split(/\r?\n/)) {
   process.env[key] = val;
 }
 
-const provider = (process.env.AI_PROVIDER || "gemini").trim();
-const serviceProviders = [
-  process.env.EXTRACTION_PROVIDER,
-  process.env.TEACHER_EXTRACTION_PROVIDER,
-  process.env.STUDENT_EXTRACTION_PROVIDER,
-  process.env.GRADING_PROVIDER,
-]
-  .filter(Boolean)
-  .map((v) => String(v).trim());
-
-const allProviders = [provider, ...serviceProviders];
-const unsupported = allProviders.filter(
-  (p) => !["gemini", "openai", "xai", "custom"].includes(p)
-);
-if (unsupported.length) {
-  console.error(`Unsupported AI provider(s): ${unsupported.join(", ")}`);
+const provider = (process.env.AI_PROVIDER || "gemini").trim().toLowerCase();
+if (provider !== "gemini") {
+  console.error(`Unsupported AI_PROVIDER: ${provider}. Use gemini.`);
   process.exit(1);
 }
 
-const aiApiKey = process.env.AI_API_KEY?.trim();
 const geminiApiKey = process.env.GEMINI_API_KEY?.trim();
-const xaiApiKey = process.env.XAI_API_KEY?.trim();
-const baseUrl = process.env.AI_BASE_URL?.trim();
-
-function hasKeyFor(p) {
-  if (p === "gemini") return Boolean(geminiApiKey || aiApiKey);
-  if (p === "xai") return Boolean(xaiApiKey || aiApiKey);
-  if (p === "openai") return Boolean(aiApiKey);
-  if (p === "custom") return Boolean(aiApiKey && baseUrl);
-  return false;
+if (!geminiApiKey || geminiApiKey === "YOUR_GOOGLE_GEMINI_API_KEY_HERE") {
+  console.error("Set GEMINI_API_KEY for Google Gemini.");
+  process.exit(1);
 }
 
-for (const p of allProviders) {
-  if (!hasKeyFor(p)) {
-    if (p === "gemini") console.error("Set GEMINI_API_KEY or AI_API_KEY for Gemini.");
-    else if (p === "xai") console.error("Set XAI_API_KEY or AI_API_KEY for xAI.");
-    else if (p === "openai") console.error("Set AI_API_KEY for OpenAI.");
-    else if (p === "custom") console.error("Set AI_API_KEY and AI_BASE_URL for the custom provider.");
-    process.exit(1);
-  }
-}
-
-console.log(`AI provider: ${provider}`);
+console.log("AI provider: gemini");
 console.log("AI env looks ready.");

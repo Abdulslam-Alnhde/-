@@ -112,7 +112,7 @@ export default function TeacherDashboard() {
             title="لا توجد اختبارات بعد"
             description="ابدأ بإنشاء أوّل اختبار لك الآن، وستظهر هنا فور الإنشاء."
             action={
-              <Button asChild className="h-11 gap-2 rounded-xl bg-brand-orange font-bold text-white shadow-md shadow-brand-orange/30 hover:bg-brand-orange-dark">
+              <Button asChild className="h-11 gap-2 rounded-xl bg-foreground font-bold text-background shadow-md hover:bg-foreground/85">
                 <Link href={TEACHER_LINKS.createExam}>
                   <Plus className="h-4 w-4" /> إنشاء اختبار جديد
                 </Link>
@@ -128,7 +128,7 @@ export default function TeacherDashboard() {
                 className="group relative flex flex-wrap items-center gap-4 px-6 py-4 transition hover:bg-brand-teal-light/20"
               >
                 {/* hover accent bar (right side in RTL) */}
-                <span className="absolute inset-y-0 right-0 w-1 origin-bottom scale-y-0 bg-gradient-to-t from-brand-teal to-brand-orange transition-transform group-hover:scale-y-100" />
+                <span className="absolute inset-y-0 right-0 w-1 origin-bottom scale-y-0 bg-brand-teal transition-transform group-hover:scale-y-100" />
 
                 {/* Icon avatar */}
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-teal-light to-white text-brand-teal-dark ring-1 ring-brand-teal/20 transition group-hover:ring-brand-teal/40">

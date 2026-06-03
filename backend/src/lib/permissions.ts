@@ -33,6 +33,8 @@ export const ADMIN_PANEL_PERMISSION_KEYS: readonly string[] = [
   PERMISSION_KEYS.USERS_DELETE,
 ] as const;
 
+export const ALL_PERMISSION_KEYS: readonly string[] = Object.values(PERMISSION_KEYS);
+
 const committeeSet = new Set(COMMITTEE_PERMISSION_KEYS);
 const adminPanelSet = new Set(ADMIN_PANEL_PERMISSION_KEYS);
 

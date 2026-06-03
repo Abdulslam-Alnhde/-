@@ -19,6 +19,12 @@ export interface AIRequestOptions {
   temperature?: number;
   maxTokens?: number;
   responseMimeType?: "text/plain" | "application/json";
+  /**
+   * Controls how much the model "thinks" before answering (Gemini 2.5 thinking models).
+   * Lower effort = faster + cheaper, which suits OCR/transcription tasks.
+   * Ignored for non-thinking models (e.g. gemini-2.0-*).
+   */
+  reasoningEffort?: "none" | "low" | "medium" | "high";
 }
 
 export interface AIResponse {
@@ -31,11 +37,7 @@ export interface AIResponse {
   };
 }
 
-export type AIProviderKind =
-  | "openai"
-  | "xai"
-  | "custom"
-  | "gemini";
+export type AIProviderKind = "gemini";
 
 export interface AIServiceConfig {
   apiKey: string;

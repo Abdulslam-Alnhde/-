@@ -9,6 +9,7 @@ import {
   StudentExtractionError,
   type StudentExtractionLogger,
 } from "@/lib/extract-student-core";
+import type { StudentExamContext } from "@/lib/ai-prompts";
 
 const STUDENT_REQUEST_TIMEOUT_MS = Math.max(
   30000,
@@ -100,15 +101,37 @@ export async function handleExtractStudent(req: Request): Promise<Response> {
       );
     }
 
-    let questions: Array<{ id: number; label?: string; text?: string }> = [];
+    let questions: Array<{ id: number; label?: string; text?: string; examContext?: StudentExamContext }> = [];
     if (examQuestionsRaw) {
       try {
         const parsed = JSON.parse(String(examQuestionsRaw));
-        questions = Array.isArray(parsed) ? parsed : [];
+        const rawList = Array.isArray(parsed) ? parsed : [];
+        questions = rawList.map((q: any) => {
+          const base: { id: number; label?: string; text?: string; examContext?: StudentExamContext } = {
+            id: Number(q.id) || 0,
+            label: q.label,
+            text: q.text,
+          };
+          if (q.questionType || q.modelAnswer || q.questionMaxPoints || q.keyPoints) {
+            base.examContext = {
+              questionType: q.questionType === "OBJECTIVE" ? "OBJECTIVE" : q.questionType === "RUBRIC" ? "RUBRIC" : undefined,
+              modelAnswer: typeof q.modelAnswer === "string" ? q.modelAnswer : undefined,
+              questionMaxPoints: typeof q.questionMaxPoints === "number" ? q.questionMaxPoints : undefined,
+              keyPoints: Array.isArray(q.keyPoints)
+                ? q.keyPoints.map((kp: any) => typeof kp === "string" ? kp : String(kp?.point || "")).filter(Boolean)
+                : undefined,
+              teacherNote: typeof q.teacherNote === "string" ? q.teacherNote : undefined,
+            };
+          }
+          return base;
+        });
         logger({
           stage: "form.questions.parsed",
           message: "Exam questions parsed from request payload.",
-          meta: { questionCount: questions.length },
+          meta: {
+            questionCount: questions.length,
+            hasExamContext: questions.some((q) => q.examContext != null),
+          },
         });
       } catch (error) {
         logger({
@@ -151,6 +174,12 @@ export async function handleExtractStudent(req: Request): Promise<Response> {
       );
     }
 
+    const singleExamContext: StudentExamContext | undefined = (() => {
+      if (!isSingleQuestion) return undefined;
+      const match = questions.find((q) => q.id === targetQuestionNumber);
+      return match?.examContext;
+    })();
+
     const extractionTask: Promise<unknown> = isSingleQuestion
       ? (async () =>
           extractSingleStudentAnswer({
@@ -158,10 +187,12 @@ export async function handleExtractStudent(req: Request): Promise<Response> {
               questionNumber: targetQuestionNumber,
               questionText: targetQuestionText,
               questionLabel: targetQuestionLabel,
+              examContext: singleExamContext,
             }),
             file,
             providers,
             questionNumber: targetQuestionNumber,
+            examContext: singleExamContext,
             logger,
           }))()
       : extractStudentAnswersInBatches({

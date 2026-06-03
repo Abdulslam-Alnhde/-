@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  LogIn,
   GraduationCap,
   ClipboardCheck,
   ShieldCheck,
@@ -57,44 +56,9 @@ const FEATURES = [
   },
 ];
 
-const STATS = [
-  { v: "+95%", l: "دقّة التصحيح" },
-  { v: "5×", l: "أسرع من اليدوي" },
-  { v: "3", l: "أدوار متكاملة" },
-];
-
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#F5F7F7] text-foreground antialiased">
-      {/* ============== TOP NAV ============== */}
-      <header className="sticky top-0 z-30 border-b border-brand-teal/15 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-gradient-to-br from-brand-teal to-brand-teal-dark p-1 shadow-sm shadow-brand-teal/30">
-              <div className="rounded-[10px] bg-white p-1">
-                <AlarabLogo size="sm" priority />
-              </div>
-            </div>
-            <div className="hidden flex-col leading-tight sm:flex">
-              <span className="text-sm font-bold text-brand-teal-dark">جامعة العرب</span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-orange">
-                Exams Platform
-              </span>
-            </div>
-          </div>
-
-          <Button
-            asChild
-            className="h-10 rounded-full bg-brand-orange px-5 text-sm font-bold text-white shadow-md shadow-brand-orange/30 transition hover:bg-brand-orange-dark"
-          >
-            <Link href="/login" prefetch={false} className="gap-2">
-              <LogIn className="h-4 w-4" />
-              تسجيل الدخول
-            </Link>
-          </Button>
-        </div>
-      </header>
-
       {/* ============== HERO (light) ============== */}
       <section className="relative overflow-hidden">
         {/* soft mesh background */}
@@ -140,7 +104,6 @@ export default function LandingPage() {
                 className="group h-14 rounded-full bg-brand-orange px-9 text-base font-black text-white shadow-xl shadow-brand-orange/30 transition hover:bg-brand-orange-dark"
               >
                 <Link href="/login" prefetch={false} className="gap-2">
-                  <LogIn className="h-5 w-5" />
                   ابدأ الآن
                   <ArrowLeft className="h-5 w-5 transition group-hover:-translate-x-1" />
                 </Link>
@@ -157,30 +120,13 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* LEFT in RTL: logo + stats */}
+          {/* LEFT in RTL: logo */}
           <div className="flex flex-col items-center gap-8">
             <div className="relative">
               <div className="absolute inset-0 -m-8 rounded-full bg-gradient-to-br from-brand-orange/20 via-transparent to-brand-teal/25 blur-3xl" />
               <div className="relative rounded-3xl border border-brand-teal/20 bg-white p-6 shadow-2xl shadow-brand-teal/15 sm:p-8">
                 <AlarabLogo size="lg" priority />
               </div>
-            </div>
-
-            {/* stats — light cards */}
-            <div className="grid w-full max-w-md grid-cols-3 gap-3">
-              {STATS.map((s) => (
-                <div
-                  key={s.l}
-                  className="rounded-2xl border border-brand-teal/20 bg-white p-4 text-center shadow-sm"
-                >
-                  <p className="text-2xl font-black text-brand-orange md:text-3xl">
-                    {s.v}
-                  </p>
-                  <p className="mt-1 text-[11px] font-bold text-muted-foreground">
-                    {s.l}
-                  </p>
-                </div>
-              ))}
             </div>
           </div>
         </div>
@@ -273,38 +219,6 @@ export default function LandingPage() {
                 </p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============== CTA STRIP (light) ============== */}
-      <section className="relative overflow-hidden bg-white py-16">
-        <div
-          className="pointer-events-none absolute inset-0"
-          aria-hidden
-          style={{
-            backgroundImage: `radial-gradient(circle at 80% 50%, rgba(242,101,34,0.12) 0%, transparent 40%),
-              radial-gradient(circle at 20% 50%, rgba(0,169,157,0.18) 0%, transparent 40%)`,
-          }}
-        />
-        <div className="relative mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-3xl border-2 border-brand-teal/20 bg-gradient-to-bl from-brand-teal-light/60 via-white to-brand-orange/5 p-10 text-center shadow-md">
-            <h2 className="text-2xl font-black md:text-4xl" style={{ color: "#1A2E2D" }}>
-              جاهز لتختبر التصحيح الذكي؟
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl text-base text-muted-foreground">
-              سجّل الدخول بحسابك الجامعي وابدأ خلال دقائق.
-            </p>
-            <Button
-              asChild
-              size="lg"
-              className="mt-8 h-14 rounded-full bg-brand-orange px-12 text-base font-black text-white shadow-xl shadow-brand-orange/30 hover:bg-brand-orange-dark"
-            >
-              <Link href="/login" prefetch={false} className="gap-2">
-                <LogIn className="h-5 w-5" />
-                تسجيل الدخول
-              </Link>
-            </Button>
           </div>
         </div>
       </section>

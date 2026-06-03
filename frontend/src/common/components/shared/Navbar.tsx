@@ -77,7 +77,7 @@ export function Navbar({
         >
           <Bell className="h-[18px] w-[18px]" />
           {!onMailPage && (
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-card bg-brand-orange" />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-card bg-brand-teal" />
           )}
         </Link>
 

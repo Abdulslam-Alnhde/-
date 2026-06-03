@@ -1,72 +1,24 @@
 import { AIProvider } from "./provider-interface";
-import { OpenAIProvider } from "./providers/openai-provider";
-import { XAIProvider } from "./providers/xai-provider";
+import { GeminiProvider } from "./providers/gemini-provider";
 import { AIProviderKind, AIServiceConfig } from "./types";
 
-const DEFAULT_BASE_URLS: Record<AIProviderKind, string | undefined> = {
-  openai: "https://api.openai.com/v1",
-  xai: "https://api.x.ai/v1",
-  gemini: "https://generativelanguage.googleapis.com/v1beta/openai",
-  custom: undefined,
-};
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
 
 function normalizeProvider(raw: string): AIProviderKind {
-  const v = raw.trim().toLowerCase();
-  if (v === "openai" || v === "xai" || v === "gemini" || v === "custom") {
-    return v;
-  }
+  const provider = raw.trim().toLowerCase();
+  if (!provider || provider === "gemini") return "gemini";
   return "gemini";
 }
 
-function ensureProviderKey(params: {
-  provider: AIProviderKind;
-  apiKey: string;
-  baseUrl?: string;
-}) {
-  const { provider, apiKey, baseUrl } = params;
-
-  if (!apiKey) {
-    if (provider === "xai") {
-      throw new Error("XAI_API_KEY is missing. Set it in your environment/.env.");
-    }
-    if (provider === "gemini") {
-      throw new Error("GEMINI_API_KEY (or AI_API_KEY) is missing. Set it in your environment/.env.");
-    }
-    throw new Error("AI_API_KEY is missing. Set it in your environment/.env.");
-  }
-
-  if (provider === "custom" && !baseUrl) {
-    throw new Error("AI_BASE_URL is missing for the custom AI provider. Set it in your environment/.env.");
+function ensureProviderKey(apiKey: string) {
+  if (!apiKey || apiKey === "YOUR_GOOGLE_GEMINI_API_KEY_HERE") {
+    throw new Error("GEMINI_API_KEY is missing. Set it in your environment/.env.");
   }
 }
 
 export class AIFactory {
   static createProvider(config: AIServiceConfig): AIProvider {
-    const baseUrl = config.baseUrl || DEFAULT_BASE_URLS[config.provider];
-    switch (config.provider) {
-      case "xai":
-        return new XAIProvider(config.apiKey, baseUrl || "https://api.x.ai/v1");
-      case "openai":
-        return new OpenAIProvider(
-          config.apiKey,
-          baseUrl || "https://api.openai.com/v1",
-          config.name || "openai"
-        );
-      case "gemini":
-        return new OpenAIProvider(
-          config.apiKey,
-          baseUrl || "https://generativelanguage.googleapis.com/v1beta/openai",
-          config.name || "gemini"
-        );
-      case "custom":
-        return new OpenAIProvider(
-          config.apiKey,
-          baseUrl,
-          config.name || "custom"
-        );
-      default:
-        throw new Error(`Unsupported AI provider: ${(config as AIServiceConfig).provider}`);
-    }
+    return new GeminiProvider(config.apiKey, config.baseUrl || GEMINI_BASE_URL);
   }
 
   /** Pick env value with the first defined-and-trimmed key. */
@@ -82,9 +34,8 @@ export class AIFactory {
   }
 
   /**
-   * Build a config from per-service env, falling back to global AI_* vars.
-   * For example, service "GRADING" reads GRADING_PROVIDER, GRADING_API_KEY,
-   * GRADING_BASE_URL — falling back to AI_PROVIDER, AI_API_KEY, AI_BASE_URL.
+   * Build a Google Gemini config from service-specific keys when present,
+   * otherwise from the global Gemini key.
    */
   static configForService(serviceEnvPrefix: string): AIServiceConfig {
     const rawProvider = AIFactory.pickEnv(
@@ -95,17 +46,14 @@ export class AIFactory {
 
     const apiKey = AIFactory.pickEnv(
       `${serviceEnvPrefix}_API_KEY`,
-      provider === "xai" ? "XAI_API_KEY" : "",
-      provider === "gemini" ? "GEMINI_API_KEY" : "",
-      "AI_API_KEY",
-      provider === "xai" ? "AI_API_KEY" : ""
+      "GEMINI_API_KEY"
     );
 
     const baseUrl =
       AIFactory.pickEnv(`${serviceEnvPrefix}_BASE_URL`, "AI_BASE_URL") ||
-      DEFAULT_BASE_URLS[provider];
+      GEMINI_BASE_URL;
 
-    ensureProviderKey({ provider, apiKey, baseUrl });
+    ensureProviderKey(apiKey);
 
     return {
       provider,
@@ -115,7 +63,7 @@ export class AIFactory {
     };
   }
 
-  /** Backward-compat: legacy global config (uses AI_PROVIDER + global keys). */
+  /** Backward-compat: legacy global config name, now Gemini-only. */
   static configsFromEnv(): AIServiceConfig[] {
     return [AIFactory.configForService("AI")];
   }

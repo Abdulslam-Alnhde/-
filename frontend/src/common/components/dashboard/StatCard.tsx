@@ -16,7 +16,7 @@ type StatCardProps = {
 
 const TONES: Record<Tone, { iconBg: string; iconText: string }> = {
   teal: { iconBg: "bg-brand-teal-light", iconText: "text-brand-teal" },
-  orange: { iconBg: "bg-brand-orange/10", iconText: "text-brand-orange" },
+  orange: { iconBg: "bg-brand-teal-light", iconText: "text-brand-teal-dark" },
   danger: { iconBg: "bg-[#FFEBEB]", iconText: "text-[#D32F2F]" },
   neutral: { iconBg: "bg-muted", iconText: "text-muted-foreground" },
 };

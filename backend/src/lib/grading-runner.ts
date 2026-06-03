@@ -23,7 +23,6 @@ import {
   setCachedGradingJson,
 } from "@/lib/grading-cache";
 import { aiManager } from "@/lib/ai-manager";
-import { AIFactory } from "@/lib/ai/factory";
 import {
   buildGradingPrompt,
   buildSemanticRescuePrompt,
@@ -376,14 +375,9 @@ export async function runGrading(req: Request): Promise<Response> {
       return Response.json(deepRound2Values(cached));
     }
 
-    const providerKind = aiManager.getServiceProviderKind(SERVICE);
-    const isLocalProvider = providerKind === "custom";
     const provider = aiManager.getServiceProvider(SERVICE);
     const MODELS = aiManager.getServiceModels(SERVICE);
-
-    // Cloud providers: cap tokens to avoid cost/timeout issues.
-    // Custom providers may be local, so leave their token cap unset.
-    const maxTokens = isLocalProvider ? undefined : 8192;
+    const maxTokens = 8192;
 
     const runGradingPipeline = async (): Promise<Record<string, unknown>> => {
       const prompt = buildGradingPrompt({
@@ -425,45 +419,16 @@ export async function runGrading(req: Request): Promise<Response> {
               await sleep(750);
               continue;
             }
-            console.error(`[grading] Model ${modelName} (${providerKind}) failed:`, msg);
+            console.error(`[grading] Model ${modelName} (gemini) failed:`, msg);
             continue outer;
           }
-        }
-      }
-
-      // If a custom provider failed entirely, fall back to the global Gemini config.
-      if (!rawResponse.trim() && isLocalProvider) {
-        console.warn(
-          `[grading] Custom provider (${providerKind}) unreachable or failed. Falling back to Gemini.`
-        );
-        try {
-          const cloudProvider = AIFactory.fromEnv();
-          const cloudModels = (process.env.AI_MODELS || "")
-            .split(",")
-            .map((m) => m.trim())
-            .filter(Boolean);
-          const cloudModel = cloudModels[0] || "gemini-2.0-flash";
-          const fallbackResult = await cloudProvider.generateContent(
-            [{ text: prompt }],
-            {
-              model: cloudModel,
-              temperature: 0,
-              maxTokens: 8192,
-              responseMimeType: "application/json",
-            }
-          );
-          rawResponse = fallbackResult.text || "";
-        } catch (fallbackErr) {
-          console.error("[grading] Cloud fallback also failed:", fallbackErr);
         }
       }
 
       if (!rawResponse.trim()) {
         console.error("Grading Error (all models):", lastError);
         throw new GradingHttpError(500, {
-          error: isLocalProvider
-            ? "تعذر الاتصال بالمزود المخصص. تحقق من AI_BASE_URL و AI_API_KEY ثم أعد المحاولة."
-            : userFacingAIError(lastError ?? new Error("ÙØ´Ù„ Ø§Ù„ØªØµØ­ÙŠØ­")),
+          error: userFacingAIError(lastError ?? new Error("ÙØ´Ù„ Ø§Ù„ØªØµØ­ÙŠØ­")),
         });
       }
 

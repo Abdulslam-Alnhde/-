@@ -1,5 +1,11 @@
 ﻿import { aiManager } from "@/lib/ai-manager";
-import { prepareFileForAI, type FilePreparationTrace } from "@/lib/ai-file-parts";
+import {
+  detectMimeType,
+  extractPdfText,
+  isPdfMime,
+  prepareFileForAI,
+  type FilePreparationTrace,
+} from "@/lib/ai-file-parts";
 import type { AIProvider } from "@/lib/ai/provider-interface";
 import type { AIResponse } from "@/lib/ai/types";
 import {
@@ -9,32 +15,60 @@ import {
 import {
   buildStudentBatchPrompt,
   buildStudentJsonRepairPrompt,
+  buildStudentLenientBatchPrompt,
   buildStudentSinglePrompt,
+  type StudentExamContext,
 } from "@/lib/ai-prompts";
 
 const STUDENT_PDF_MAX_PAGES = Math.max(
   1,
-  Math.min(4, Number(process.env.STUDENT_PDF_MAX_PAGES) || 2)
+  Math.min(30, Number(process.env.STUDENT_PDF_MAX_PAGES) || 15)
 );
 
 const STUDENT_MAX_TOKENS = Math.max(
   512,
-  Math.min(3072, Number(process.env.STUDENT_EXTRACT_MAX_TOKENS) || 768)
+  Math.min(8192, Number(process.env.STUDENT_EXTRACT_MAX_TOKENS) || 8192)
 );
 
-const STUDENT_BATCH_SIZE = Math.max(
+/**
+ * Hard ceiling on the number of model calls spent on a single student paper.
+ * The free Gemini tier allows only ~20 requests/day per model, so an unbounded
+ * pipeline (strict → lenient → batch → per-question rescue) can exhaust the
+ * whole daily quota on one paper. This budget guarantees that never happens.
+ */
+const STUDENT_MAX_MODEL_CALLS = Math.max(
   1,
-  Math.min(6, Number(process.env.STUDENT_EXTRACT_BATCH_SIZE) || 2)
+  Math.min(40, Number(process.env.STUDENT_MAX_MODEL_CALLS) || 12)
 );
 
-const STUDENT_BATCH_CONCURRENCY = Math.max(
-  1,
-  Math.min(4, Number(process.env.STUDENT_EXTRACT_BATCH_CONCURRENCY) || 2)
-);
+/** Thinking effort for Gemini 2.5 models. Lower = faster OCR. Empty = provider default. */
+const STUDENT_REASONING_EFFORT = (() => {
+  const raw = String(process.env.STUDENT_REASONING_EFFORT || "low")
+    .trim()
+    .toLowerCase();
+  return raw === "none" || raw === "low" || raw === "medium" || raw === "high"
+    ? (raw as "none" | "low" | "medium" | "high")
+    : undefined;
+})();
 
 const STUDENT_RESCUE_CONCURRENCY = Math.max(
   1,
-  Math.min(4, Number(process.env.STUDENT_RESCUE_CONCURRENCY) || 2)
+  Math.min(4, Number(process.env.STUDENT_RESCUE_CONCURRENCY) || 1)
+);
+
+const STUDENT_FILE_PART_BATCH_SIZE = Math.max(
+  1,
+  Math.min(6, Number(process.env.STUDENT_FILE_PART_BATCH_SIZE) || 2)
+);
+
+const STUDENT_FILE_PART_BATCH_CONCURRENCY = Math.max(
+  1,
+  Math.min(3, Number(process.env.STUDENT_FILE_PART_BATCH_CONCURRENCY) || 1)
+);
+
+const STUDENT_FILE_PART_BATCH_MIN_PARTS = Math.max(
+  3,
+  Math.min(20, Number(process.env.STUDENT_FILE_PART_BATCH_MIN_PARTS) || 6)
 );
 
 const STUDENT_REQUEST_TIMEOUT_MS = Math.max(
@@ -68,9 +102,12 @@ const STUDENT_MODEL_RETRIES = Math.max(
   Math.min(2, Number(process.env.STUDENT_MODEL_RETRIES) || 1)
 );
 
-const STUDENT_LOCAL_MAX_TOKENS_FLOOR = Math.max(
-  1024,
-  Math.min(4096, Number(process.env.STUDENT_LOCAL_MAX_TOKENS_FLOOR) || 2048)
+const STUDENT_PDF_TEXT_CONTEXT_MAX_CHARS = Math.max(
+  2000,
+  Math.min(
+    60000,
+    Number(process.env.STUDENT_PDF_TEXT_CONTEXT_MAX_CHARS) || 24000
+  )
 );
 
 function resolveStudentModels(): string[] {
@@ -118,6 +155,52 @@ export type StudentProviderRuntime = {
   models: string[];
 };
 
+/**
+ * Tracks how many model calls a single extraction request has spent so it can
+ * never blow past the daily free-tier quota. `spend()` returns false once the
+ * budget is exhausted; callers should stop issuing further model calls.
+ */
+export type StudentRequestBudget = {
+  spend: () => boolean;
+  canSpend: () => boolean;
+  spent: () => number;
+  limit: number;
+};
+
+function createStudentRequestBudget(
+  limit = STUDENT_MAX_MODEL_CALLS
+): StudentRequestBudget {
+  let used = 0;
+  return {
+    limit,
+    spent: () => used,
+    canSpend: () => used < limit,
+    spend: () => {
+      if (used >= limit) return false;
+      used += 1;
+      return true;
+    },
+  };
+}
+
+export class StudentBudgetExhaustedError extends Error {
+  constructor(message = "Student extraction request budget exhausted.") {
+    super(message);
+    this.name = "StudentBudgetExhaustedError";
+  }
+}
+
+/** Truncated, safe JSON preview used for diagnosing empty-answer model output. */
+function safeStringifyPreview(value: unknown, maxChars = 1500): string {
+  try {
+    const text = typeof value === "string" ? value : JSON.stringify(value);
+    if (!text) return "";
+    return text.length <= maxChars ? text : `${text.slice(0, maxChars)}...[truncated]`;
+  } catch {
+    return String(value).slice(0, maxChars);
+  }
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
@@ -149,6 +232,50 @@ function isRateLimitOrQuotaRootCause(error: unknown): boolean {
   );
 }
 
+/** يفحص سلسلة الأسباب بحثًا عن خاصية وُسِم بها خطأ Gemini الخاص. */
+function findGeminiCauseProperty<K extends string>(
+  error: unknown,
+  key: K
+): unknown {
+  let current = error as (Error & { cause?: unknown }) | unknown;
+  while (current) {
+    if (current && typeof current === "object" && key in (current as object)) {
+      const value = (current as Record<string, unknown>)[key];
+      if (value !== undefined) return value;
+    }
+    if (
+      !(current instanceof Error) ||
+      !("cause" in current) ||
+      !(current as Error & { cause?: unknown }).cause
+    ) {
+      break;
+    }
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return undefined;
+}
+
+function isDailyQuotaRootCause(error: unknown): boolean {
+  if (findGeminiCauseProperty(error, "isGeminiDailyQuotaExhausted") === true) {
+    return true;
+  }
+  const rootMessage = getRootCauseMessage(error).toLowerCase();
+  return (
+    rootMessage.includes("daily quota") ||
+    rootMessage.includes("perdayperproject") ||
+    rootMessage.includes("per_day") ||
+    rootMessage.includes("free_tier_requests")
+  );
+}
+
+function getRateLimitRetryAfterSeconds(error: unknown): number | null {
+  const value = findGeminiCauseProperty(error, "retryAfterMs");
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.ceil(value / 1000);
+  }
+  return null;
+}
+
 /** إرجاع 429 للواجهات التي تعتمد على رمز الحالة (مثل مؤقت الانتظار في صفحة المراجعة). */
 function resolveHttpStatusForStudentFailure(
   explicitStatus: number,
@@ -167,11 +294,10 @@ function toUserFacingStudentFailureMessage(
   const lower = rootMessage.toLowerCase();
 
   if (
-    lower.includes("xai_api_key is missing") ||
-    lower.includes("ai_api_key is missing") ||
+    lower.includes("gemini_api_key is missing") ||
     (lower.includes("api key") && lower.includes("missing"))
   ) {
-    return "لم يتم إعداد مفتاح API لخدمة الاستخراج. أضف XAI_API_KEY في ملف .env ثم أعد تشغيل الخادم.";
+    return "لم يتم إعداد مفتاح Google Gemini API. أضف GEMINI_API_KEY في ملف .env ثم أعد تشغيل الخادم.";
   }
 
   if (
@@ -184,8 +310,24 @@ function toUserFacingStudentFailureMessage(
     return "مفتاح API المستخدم للاستخراج غير صالح أو بلا صلاحية. حدّث المفتاح في ملف .env ثم أعد المحاولة.";
   }
 
+  if (isDailyQuotaRootCause(error)) {
+    const retrySeconds = getRateLimitRetryAfterSeconds(error);
+    const wait = retrySeconds
+      ? ` انتظر حوالي ${retrySeconds} ثانية ثم حاول مجددًا،`
+      : "";
+    return (
+      `تم استنفاذ الحد اليومي المجاني لخدمة Gemini على النموذج المُستخدم.${wait} ` +
+      "أو أضف نماذج بديلة في AI_MODELS (مثل gemini-2.5-flash-lite,gemini-2.0-flash) في ملف .env، " +
+      "أو ارفع خطة المفتاح في Google AI Studio."
+    );
+  }
+
   if (lower.includes("429") || lower.includes("rate limit") || lower.includes("quota")) {
-    return "خدمة الذكاء الاصطناعي وصلت إلى حد الاستخدام الحالي. انتظر قليلًا ثم أعد المحاولة.";
+    const retrySeconds = getRateLimitRetryAfterSeconds(error);
+    if (retrySeconds) {
+      return `خدمة Gemini وصلت إلى حد الاستخدام اللحظي. انتظر حوالي ${retrySeconds} ثانية ثم أعد المحاولة.`;
+    }
+    return "خدمة Gemini وصلت إلى حد الاستخدام الحالي. انتظر قليلًا ثم أعد المحاولة.";
   }
 
   if (lower.includes("timeout") || lower.includes("timed out")) {
@@ -249,9 +391,7 @@ function normalizeQuestionLabel(value: unknown): string {
 }
 
 function resolveStudentMaxTokens(providerName: string): number {
-  if (providerName === "custom") {
-    return Math.max(STUDENT_MAX_TOKENS, STUDENT_LOCAL_MAX_TOKENS_FLOOR);
-  }
+  void providerName;
   return STUDENT_MAX_TOKENS;
 }
 
@@ -338,6 +478,11 @@ async function runWithRetries<T>(params: {
           error: error instanceof Error ? error.message : String(error),
         },
       });
+      // الحدّ اليومي للخطة المجانية لا يُصلَح بإعادة المحاولة الآن: نخرج فورًا
+      // ليتاح للسلسلة الخارجية تجريب نموذج بديل أو رفع رسالة واضحة للمستخدم.
+      if (isDailyQuotaRootCause(error)) {
+        throw error;
+      }
       if (attempt >= attempts || !isRetryableError(error)) {
         throw error;
       }
@@ -348,8 +493,16 @@ async function runWithRetries<T>(params: {
         lower.includes("rate limit") ||
         lower.includes("rate limited") ||
         lower.includes("quota");
+      const retryAfterSeconds = isRate
+        ? getRateLimitRetryAfterSeconds(error)
+        : null;
       const delayMs = isRate
-        ? Math.min(45000, 8000 + 6000 * attempt)
+        ? Math.min(
+            60000,
+            retryAfterSeconds
+              ? Math.max(retryAfterSeconds * 1000, 2000)
+              : 8000 + 6000 * attempt
+          )
         : Math.min(1500 * attempt, 4000);
       await sleep(delayMs);
     }
@@ -414,26 +567,65 @@ function parsePossiblyWrappedJson(rawResponse: string): any {
   throw new Error("No valid JSON block was found in the model response.");
 }
 
+/** Converts Arabic-Indic digits to ASCII and pulls the first integer found. */
+function extractFirstInteger(value: unknown): number | null {
+  const text = String(value ?? "")
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06f0-\u06f9]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
+  const match = text.match(/\d+/);
+  if (!match) return null;
+  const n = Number(match[0]);
+  return Number.isInteger(n) ? n : null;
+}
+
+/** Reads the student's answer text across the many keys models tend to use. */
+function readStudentAnswerText(raw: any): string {
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw.trim();
+  const candidate =
+    raw?.studentAnswer ??
+    raw?.student_answer ??
+    raw?.answer ??
+    raw?.answerText ??
+    raw?.answer_text ??
+    raw?.response ??
+    raw?.studentResponse ??
+    raw?.student_response ??
+    raw?.transcription ??
+    raw?.transcript ??
+    raw?.studentText ??
+    raw?.writtenAnswer ??
+    raw?.written ??
+    raw?.ans;
+  return String(candidate ?? "").trim();
+}
+
+function readStudentQuestionText(raw: any): string {
+  if (raw == null || typeof raw === "string") return "";
+  return String(
+    raw?.questionText ?? raw?.question ?? raw?.prompt ?? raw?.text ?? ""
+  ).trim();
+}
+
 function normalizeSingleStudentPayload(raw: any, fallbackQuestionNumber: number) {
   if (!raw || typeof raw !== "object") {
     throw new Error("Student extraction did not return a JSON object.");
   }
 
+  const inner =
+    !Array.isArray(raw) && Array.isArray(raw?.answers) && raw.answers.length > 0
+      ? raw.answers[0]
+      : raw;
+
   const questionNumber =
-    toNumber(raw?.questionNumber ?? raw?.id ?? raw?.number) ?? fallbackQuestionNumber;
-
-  const studentAnswer = String(
-    raw?.studentAnswer ?? raw?.answer ?? raw?.response ?? ""
-  ).trim();
-
-  const questionText = String(
-    raw?.questionText ?? raw?.question ?? raw?.text ?? ""
-  ).trim();
+    toNumber(inner?.questionNumber ?? inner?.id ?? inner?.number) ??
+    extractFirstInteger(inner?.questionNumber ?? inner?.questionLabel ?? inner?.label) ??
+    fallbackQuestionNumber;
 
   return {
     questionNumber,
-    questionText,
-    studentAnswer,
+    questionText: readStudentQuestionText(inner),
+    studentAnswer: readStudentAnswerText(inner),
   };
 }
 
@@ -445,11 +637,26 @@ function resolveStudentQuestionNumber(
   if (direct != null && Number.isInteger(direct)) return direct;
 
   const label = normalizeQuestionLabel(
-    raw?.questionLabel ?? raw?.displayLabel ?? raw?.label ?? raw?.questionNumber
+    raw?.questionLabel ??
+      raw?.displayLabel ??
+      raw?.label ??
+      raw?.questionNumber ??
+      raw?.id ??
+      raw?.number
   );
   if (label && labelToId?.has(label)) return labelToId.get(label) ?? null;
 
-  return direct;
+  // Models sometimes return "Q1", "1)", "السؤال ٣". Pull the first integer and
+  // map it back to a real question id when possible.
+  const fromText = extractFirstInteger(
+    raw?.questionNumber ?? raw?.id ?? raw?.number ?? raw?.questionLabel ?? raw?.label
+  );
+  if (fromText != null) {
+    const mapped = labelToId?.get(String(fromText));
+    return mapped ?? fromText;
+  }
+
+  return null;
 }
 
 function normalizeStudentAnswerItem(raw: any, labelToId?: Map<string, number>) {
@@ -458,9 +665,45 @@ function normalizeStudentAnswerItem(raw: any, labelToId?: Map<string, number>) {
 
   return {
     questionNumber,
-    questionText: String(raw?.questionText ?? raw?.question ?? raw?.text ?? "").trim(),
-    studentAnswer: String(raw?.studentAnswer ?? raw?.answer ?? raw?.response ?? "").trim(),
+    questionText: readStudentQuestionText(raw),
+    studentAnswer: readStudentAnswerText(raw),
   };
+}
+
+/** Finds the array of answer objects regardless of the wrapper key the model used. */
+function coerceStudentAnswerArray(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object") return [];
+
+  const candidateKeys = [
+    "answers",
+    "results",
+    "questions",
+    "studentAnswers",
+    "student_answers",
+    "items",
+    "data",
+    "output",
+    "extractedAnswers",
+  ];
+  for (const key of candidateKeys) {
+    if (Array.isArray(data[key])) return data[key];
+  }
+
+  // Object keyed by question number/label: { "1": "...", "Q2": { ... } }
+  const entries = Object.entries(data).filter(([key]) =>
+    extractFirstInteger(key) != null
+  );
+  if (entries.length > 0) {
+    return entries.map(([key, value]) => {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return { questionNumber: key, ...(value as object) };
+      }
+      return { questionNumber: key, studentAnswer: value };
+    });
+  }
+
+  return [];
 }
 
 function normalizeStudentBatchPayload(
@@ -475,13 +718,7 @@ function normalizeStudentBatchPayload(
     if (displayLabel) labelToId.set(displayLabel, question.id);
   }
 
-  const items = Array.isArray(data)
-    ? data
-    : Array.isArray(data?.answers)
-      ? data.answers
-      : Array.isArray(data?.results)
-        ? data.results
-        : [];
+  const items = coerceStudentAnswerArray(data);
 
   return items
     .map((item: any) => normalizeStudentAnswerItem(item, labelToId))
@@ -543,8 +780,106 @@ function mergeStudentAnswer(
   }
 }
 
-export const buildSingleQuestionPrompt = buildStudentSinglePrompt;
+function previewStudentAnswer(value: string, maxChars = 180): string {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, maxChars)}...`;
+}
+
+function logStudentQuestionRows(params: {
+  logger?: StudentExtractionLogger;
+  stage: string;
+  rows: Array<{ questionNumber: number; questionText?: string; studentAnswer: string }>;
+  meta?: Record<string, unknown>;
+}) {
+  const { logger, stage, rows, meta } = params;
+  if (!logger) return;
+
+  for (const row of rows) {
+    const answer = String(row.studentAnswer || "");
+    const hasAnswer = answer.trim().length > 0;
+    logger({
+      stage,
+      message: `Q${row.questionNumber} ${hasAnswer ? "extracted" : "checked with no visible answer"}.`,
+      meta: {
+        ...meta,
+        questionNumber: row.questionNumber,
+        hasAnswer,
+        answerLength: answer.length,
+        answerPreview: previewStudentAnswer(answer),
+      },
+    });
+  }
+}
+
+function hasVisualFilePart(part: any): boolean {
+  return Boolean(part?.image) || Boolean(part?.pdf);
+}
+
+function shouldUseFilePartBatches(fileParts: any[]): boolean {
+  const visualCount = fileParts.filter(hasVisualFilePart).length;
+  const textChars = fileParts.reduce(
+    (sum, part) => sum + (typeof part?.text === "string" ? part.text.length : 0),
+    0
+  );
+
+  return (
+    visualCount >= STUDENT_FILE_PART_BATCH_MIN_PARTS ||
+    fileParts.length >= STUDENT_FILE_PART_BATCH_MIN_PARTS ||
+    textChars > STUDENT_PDF_TEXT_CONTEXT_MAX_CHARS
+  );
+}
+
+function splitStudentFileParts(fileParts: any[]): any[][] {
+  const visualParts = fileParts.filter(hasVisualFilePart);
+  if (visualParts.length > 0) {
+    const textContextParts = fileParts.filter((part) => !hasVisualFilePart(part));
+    const visualBatches = splitIntoBatches(visualParts, STUDENT_FILE_PART_BATCH_SIZE);
+
+    return visualBatches.map((batch, index) => [
+      ...textContextParts,
+      {
+        text:
+          `[Student answer sheet part batch ${index + 1}/${visualBatches.length}]\n` +
+          "Extract only answers visible in the attached pages/images for this batch. " +
+          "Other batches will be merged by question number.",
+      },
+      ...batch,
+    ]);
+  }
+
+  return splitIntoBatches(fileParts, STUDENT_FILE_PART_BATCH_SIZE);
+}
+
+export function buildSingleQuestionPrompt(params: {
+  questionNumber: number;
+  questionText?: string;
+  questionLabel?: string;
+  examContext?: StudentExamContext;
+}): string {
+  return buildStudentSinglePrompt(params);
+}
 const buildBatchPrompt = buildStudentBatchPrompt;
+const buildLenientBatchPrompt = buildStudentLenientBatchPrompt;
+
+function buildFinalStudentResults(
+  questions: Array<{ id: number; text?: string }>,
+  resultsMap: Map<
+    number,
+    { questionNumber: number; questionText: string; studentAnswer: string }
+  >
+) {
+  return questions.map((q) => {
+    const found = resultsMap.get(q.id);
+    return (
+      found ?? {
+        questionNumber: q.id,
+        questionText: q.text || "",
+        studentAnswer: "",
+      }
+    );
+  });
+}
 
 function studentFileTrace(logger?: StudentExtractionLogger): FilePreparationTrace | undefined {
   if (!logger) return undefined;
@@ -574,6 +909,62 @@ function createStudentFilePartsPrompt(providerName: string): {
   };
 }
 
+function trimStudentPdfTextContext(text: string): string {
+  const normalized = String(text || "").trim();
+  if (normalized.length <= STUDENT_PDF_TEXT_CONTEXT_MAX_CHARS) return normalized;
+  return `${normalized.slice(0, STUDENT_PDF_TEXT_CONTEXT_MAX_CHARS)}\n\n[TRUNCATED ${normalized.length - STUDENT_PDF_TEXT_CONTEXT_MAX_CHARS} CHARS]`;
+}
+
+async function buildStudentPdfTextContextPart(params: {
+  file: File;
+  logger?: StudentExtractionLogger;
+}) {
+  const { file, logger } = params;
+  const includePdfTextContext =
+    String(process.env.STUDENT_INCLUDE_PDF_TEXT_CONTEXT || "false")
+      .trim()
+      .toLowerCase() === "true";
+  if (!includePdfTextContext) {
+    return null;
+  }
+  if (!isPdfMime(detectMimeType(file))) return null;
+
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const text = await extractPdfText(buffer, studentFileTrace(logger));
+    if (!text || text.trim().length < 80) {
+      logger?.({
+        stage: "file.pdf.text.context.skipped",
+        message: "PDF text context was unavailable or too short.",
+        meta: { fileName: file.name, charCount: text?.trim().length || 0 },
+      });
+      return null;
+    }
+
+    const trimmed = trimStudentPdfTextContext(text);
+    logger?.({
+      stage: "file.pdf.text.context.available",
+      message: "PDF text context added to student extraction parts.",
+      meta: { fileName: file.name, charCount: trimmed.length },
+    });
+
+    return {
+      text: `[Student answer sheet extracted PDF text]\n${file.name}\n\n${trimmed}`,
+    };
+  } catch (error) {
+    logger?.({
+      stage: "file.pdf.text.context.failed",
+      level: "warn",
+      message: "Failed to extract PDF text context; continuing with rendered pages.",
+      meta: {
+        fileName: file.name,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
+    return null;
+  }
+}
+
 async function buildFileParts(params: {
   file: File;
   providerName: string;
@@ -587,17 +978,24 @@ async function buildFileParts(params: {
     meta: { fileName: file.name, providerName },
   });
 
-  const parts = await runWithTimeout<any[]>(
-    prepareFileForAI(file, {
-      providerName,
-      roleLabel: "Student answer sheet",
-      maxPdfPages: STUDENT_PDF_MAX_PAGES,
-      ...createStudentFilePartsPrompt(providerName),
-      trace: studentFileTrace(logger),
-    }),
-    STUDENT_PREP_TIMEOUT_MS,
-    `file preparation (${file.name})`
-  );
+  const [pdfTextContextPart, preparedParts] = await Promise.all([
+    buildStudentPdfTextContextPart({ file, logger }),
+    runWithTimeout<any[]>(
+      prepareFileForAI(file, {
+        providerName,
+        roleLabel: "Student answer sheet",
+        maxPdfPages: STUDENT_PDF_MAX_PAGES,
+        ...createStudentFilePartsPrompt(providerName),
+        trace: studentFileTrace(logger),
+      }),
+      STUDENT_PREP_TIMEOUT_MS,
+      `file preparation (${file.name})`
+    ),
+  ]);
+
+  const parts = pdfTextContextPart
+    ? [pdfTextContextPart, ...preparedParts]
+    : preparedParts;
 
   logger?.({
     stage: "file.prepare.done",
@@ -619,13 +1017,25 @@ async function callModelWithTimeout(params: {
   prompt: string;
   fileParts: any[];
   logger?: StudentExtractionLogger;
+  budget?: StudentRequestBudget;
 }) {
-  const { provider, modelName, prompt, fileParts, logger } = params;
+  const { provider, modelName, prompt, fileParts, logger, budget } = params;
+  if (budget && !budget.spend()) {
+    throw new StudentBudgetExhaustedError(
+      `Request budget of ${budget.limit} model calls reached; stopping to protect the daily quota.`
+    );
+  }
   const start = Date.now();
   logger?.({
     stage: "model.call.start",
     message: "Calling model for extraction.",
-    meta: { providerName: provider.name, modelName, filePartsCount: fileParts.length },
+    meta: {
+      providerName: provider.name,
+      modelName,
+      filePartsCount: fileParts.length,
+      budgetSpent: budget?.spent(),
+      budgetLimit: budget?.limit,
+    },
   });
 
   const result = await runWithRetries<AIResponse>({
@@ -640,6 +1050,7 @@ async function callModelWithTimeout(params: {
           temperature: 0,
           maxTokens: resolveStudentMaxTokens(provider.name),
           responseMimeType: "application/json",
+          reasoningEffort: STUDENT_REASONING_EFFORT,
         }),
         STUDENT_MODEL_TIMEOUT_MS,
         `model call ${provider.name}/${modelName}`
@@ -668,9 +1079,17 @@ async function generateParsedModelOutput(params: {
   prompt: string;
   fileParts: any[];
   logger?: StudentExtractionLogger;
+  budget?: StudentRequestBudget;
 }) {
-  const { provider, modelName, prompt, fileParts, logger } = params;
-  const result = await callModelWithTimeout({ provider, modelName, prompt, fileParts, logger });
+  const { provider, modelName, prompt, fileParts, logger, budget } = params;
+  const result = await callModelWithTimeout({
+    provider,
+    modelName,
+    prompt,
+    fileParts,
+    logger,
+    budget,
+  });
 
   try {
     return parsePossiblyWrappedJson(result.text || "");
@@ -692,6 +1111,7 @@ async function generateParsedModelOutput(params: {
       prompt: buildStudentJsonRepairPrompt(result.text || ""),
       fileParts: [],
       logger,
+      budget,
     });
 
     return parsePossiblyWrappedJson(repaired.text || "");
@@ -730,9 +1150,11 @@ export async function extractSingleStudentAnswer(params: {
   providers: StudentProviderRuntime[];
   questionNumber: number;
   logger?: StudentExtractionLogger;
+  examContext?: StudentExamContext;
 }) {
   const { prompt, file, providers, questionNumber, logger } = params;
   let lastError: unknown = null;
+  const budget = createStudentRequestBudget();
 
   for (const runtime of providers) {
     let fileParts: any[] = [];
@@ -757,13 +1179,68 @@ export async function extractSingleStudentAnswer(params: {
     }
 
     for (const modelName of runtime.models) {
+      if (!budget.canSpend()) break;
       try {
+        if (shouldUseFilePartBatches(fileParts)) {
+          const filePartBatches = splitStudentFileParts(fileParts);
+          let emptyResult:
+            | { questionNumber: number; questionText: string; studentAnswer: string }
+            | null = null;
+
+          logger?.({
+            stage: "single.file-batch.plan",
+            message: "Single-question extraction will scan the file in smaller part batches.",
+            meta: {
+              providerName: runtime.provider.name,
+              modelName,
+              questionNumber,
+              filePartsCount: fileParts.length,
+              filePartBatchCount: filePartBatches.length,
+            },
+          });
+
+          for (let i = 0; i < filePartBatches.length; i += 1) {
+            if (!budget.canSpend()) break;
+            const partBatchNumber = i + 1;
+            const raw = await generateParsedModelOutput({
+              provider: runtime.provider,
+              modelName,
+              prompt,
+              fileParts: filePartBatches[i],
+              logger,
+              budget,
+            });
+            const normalized = normalizeSingleStudentPayload(raw, questionNumber);
+            logStudentQuestionRows({
+              logger,
+              stage: "single.file-batch.question",
+              rows: [normalized],
+              meta: {
+                providerName: runtime.provider.name,
+                modelName,
+                partBatchNumber,
+                partBatchCount: filePartBatches.length,
+              },
+            });
+
+            if (normalized.studentAnswer.trim()) {
+              return normalized;
+            }
+            emptyResult ??= normalized;
+          }
+
+          if (emptyResult) {
+            return emptyResult;
+          }
+        }
+
         const raw = await generateParsedModelOutput({
           provider: runtime.provider,
           modelName,
           prompt,
           fileParts,
           logger,
+          budget,
         });
         const normalized = normalizeSingleStudentPayload(raw, questionNumber);
         logger?.({
@@ -776,25 +1253,61 @@ export async function extractSingleStudentAnswer(params: {
             answerLength: normalized.studentAnswer.length,
           },
         });
+        logStudentQuestionRows({
+          logger,
+          stage: "single.question",
+          rows: [normalized],
+          meta: {
+            providerName: runtime.provider.name,
+            modelName,
+          },
+        });
         return normalized;
       } catch (error) {
         lastError = error;
+        if (error instanceof StudentBudgetExhaustedError) break;
+        const isRateLimited = isRateLimitOrQuotaRootCause(error);
+        const isDailyQuota = isDailyQuotaRootCause(error);
+        const retryAfterSeconds = getRateLimitRetryAfterSeconds(error);
         logger?.({
           stage: "single.model.failed",
           level: "warn",
-          message: "Single-question extraction attempt failed.",
+          message: isDailyQuota
+            ? `Model ${modelName} hit its daily free-tier quota during single-question extraction; trying next model.`
+            : isRateLimited
+              ? `Model ${modelName} was rate limited during single-question extraction; trying next model.`
+              : "Single-question extraction attempt failed.",
           meta: {
             providerName: runtime.provider.name,
             modelName,
             error: error instanceof Error ? error.message : String(error),
+            isRateLimited,
+            isDailyQuota,
+            retryAfterSeconds,
           },
         });
+        // نستمر في الحلقة لتجريب النموذج التالي حتى على 429.
       }
     }
   }
 
   if (lastError instanceof StudentExtractionError) {
     throw lastError;
+  }
+
+  if (isRateLimitOrQuotaRootCause(lastError)) {
+    throw createStudentFailure({
+      fallbackMessage:
+        "تم استنفاذ حد الاستخدام لجميع نماذج Gemini المُهيَّأة. أضف نماذج بديلة في AI_MODELS أو ارفع خطة المفتاح ثم أعد المحاولة.",
+      statusCode: 429,
+      code: isDailyQuotaRootCause(lastError)
+        ? "DAILY_QUOTA_EXHAUSTED"
+        : "RATE_LIMITED",
+      details: {
+        retryAfterSeconds: getRateLimitRetryAfterSeconds(lastError),
+      },
+      cause: lastError,
+    });
   }
 
   throw createStudentFailure({
@@ -806,20 +1319,258 @@ export async function extractSingleStudentAnswer(params: {
   });
 }
 
+async function extractStudentAnswersAcrossFilePartBatches(params: {
+  runtime: StudentProviderRuntime;
+  modelName: string;
+  questions: Array<{ id: number; label?: string; text?: string; examContext?: StudentExamContext }>;
+  fileParts: any[];
+  logger?: StudentExtractionLogger;
+  mode: "strict" | "lenient";
+  budget?: StudentRequestBudget;
+}) {
+  const { runtime, modelName, questions, fileParts, logger, mode, budget } = params;
+  const filePartBatches = splitStudentFileParts(fileParts);
+  const resultsMap = new Map<
+    number,
+    { questionNumber: number; questionText: string; studentAnswer: string }
+  >();
+
+  logger?.({
+    stage: "file-batch.plan",
+    message: "Student extraction will scan the file in smaller part batches.",
+    meta: {
+      providerName: runtime.provider.name,
+      modelName,
+      mode,
+      filePartsCount: fileParts.length,
+      filePartBatchCount: filePartBatches.length,
+      filePartBatchSize: STUDENT_FILE_PART_BATCH_SIZE,
+      questionCount: questions.length,
+      concurrency: STUDENT_FILE_PART_BATCH_CONCURRENCY,
+    },
+  });
+
+  const outputs = await mapWithConcurrency(
+    filePartBatches,
+    STUDENT_FILE_PART_BATCH_CONCURRENCY,
+    async (partBatch, partBatchIndex) => {
+      const partBatchNumber = partBatchIndex + 1;
+      const partBatchStart = Date.now();
+      logger?.({
+        stage: "file-batch.start",
+        message: `Scanning student answer sheet part batch ${partBatchNumber}/${filePartBatches.length}.`,
+        meta: {
+          providerName: runtime.provider.name,
+          modelName,
+          mode,
+          partBatchNumber,
+          partBatchCount: filePartBatches.length,
+          partCount: partBatch.length,
+        },
+      });
+
+      const raw = await generateParsedModelOutput({
+        provider: runtime.provider,
+        modelName,
+        prompt:
+          mode === "lenient"
+            ? buildLenientBatchPrompt(questions)
+            : buildBatchPrompt(questions),
+        fileParts: partBatch,
+        logger,
+        budget,
+      });
+      const normalized = normalizeStudentBatchPayload(raw, questions);
+
+      logger?.({
+        stage: "file-batch.done",
+        message: `Student file part batch ${partBatchNumber}/${filePartBatches.length} completed.`,
+        durationMs: Date.now() - partBatchStart,
+        meta: {
+          providerName: runtime.provider.name,
+          modelName,
+          mode,
+          partBatchNumber,
+          partBatchCount: filePartBatches.length,
+          extractedCount: normalized.filter((item: { studentAnswer: string }) =>
+            item.studentAnswer.trim()
+          ).length,
+        },
+      });
+      logStudentQuestionRows({
+        logger,
+        stage: "file-batch.question",
+        rows: normalized,
+        meta: {
+          providerName: runtime.provider.name,
+          modelName,
+          mode,
+          partBatchNumber,
+          partBatchCount: filePartBatches.length,
+        },
+      });
+
+      return normalized;
+    }
+  );
+
+  for (const normalized of outputs) {
+    for (const item of normalized) {
+      mergeStudentAnswer(resultsMap, item);
+    }
+  }
+
+  const finalResults = buildFinalStudentResults(questions, resultsMap);
+  logStudentQuestionRows({
+    logger,
+    stage: "file-batch.final-question",
+    rows: finalResults,
+    meta: {
+      providerName: runtime.provider.name,
+      modelName,
+      mode,
+      filePartBatchCount: filePartBatches.length,
+    },
+  });
+
+  return finalResults;
+}
+
+/**
+ * Re-extracts only the questions that came back empty — one model call per
+ * question, with the first configured model, capped by the shared request
+ * budget. Used after a pass already found *some* answers (a partial paper);
+ * re-scanning an apparently blank paper just wastes the daily quota.
+ */
+async function rescueMissingStudentAnswers(params: {
+  runtime: StudentProviderRuntime;
+  questions: Array<{ id: number; label?: string; text?: string; examContext?: StudentExamContext }>;
+  finalResults: Array<{ questionNumber: number; questionText: string; studentAnswer: string }>;
+  resultsMap: Map<
+    number,
+    { questionNumber: number; questionText: string; studentAnswer: string }
+  >;
+  fileParts: any[];
+  logger?: StudentExtractionLogger;
+  budget: StudentRequestBudget;
+  rescueLimit: number;
+}) {
+  const {
+    runtime,
+    questions,
+    finalResults,
+    resultsMap,
+    fileParts,
+    logger,
+    budget,
+    rescueLimit,
+  } = params;
+
+  const missing = finalResults
+    .filter((row) => !String(row.studentAnswer || "").trim())
+    .slice(0, rescueLimit);
+  if (missing.length === 0) return finalResults;
+
+  const rescueModel = runtime.models[0];
+  logger?.({
+    stage: "missing.rescue.start",
+    message: "Rescuing missing handwritten answers (single model, budget-aware).",
+    meta: {
+      providerName: runtime.provider.name,
+      modelName: rescueModel,
+      missingCount: missing.length,
+      rescueLimit,
+      budgetRemaining: budget.limit - budget.spent(),
+    },
+  });
+
+  const rescuedRows = await mapWithConcurrency(
+    missing,
+    STUDENT_RESCUE_CONCURRENCY,
+    async (row) => {
+      if (!budget.canSpend()) {
+        return { row, rescued: null as { studentAnswer: string } | null };
+      }
+      const q = questions.find((qq) => qq.id === row.questionNumber);
+      const prompt = buildSingleQuestionPrompt({
+        questionNumber: row.questionNumber,
+        questionText: q?.text || row.questionText || "",
+        questionLabel: q?.label,
+        examContext: q?.examContext,
+      });
+      try {
+        const raw = await generateParsedModelOutput({
+          provider: runtime.provider,
+          modelName: rescueModel,
+          prompt,
+          fileParts,
+          logger,
+          budget,
+        });
+        const normalized = normalizeSingleStudentPayload(raw, row.questionNumber);
+        return {
+          row,
+          rescued: normalized.studentAnswer.trim() ? normalized : null,
+        };
+      } catch {
+        return { row, rescued: null };
+      }
+    }
+  );
+
+  for (const { row, rescued } of rescuedRows) {
+    if (!rescued || !String(rescued.studentAnswer || "").trim()) continue;
+    mergeStudentAnswer(resultsMap, rescued as {
+      questionNumber: number;
+      questionText: string;
+      studentAnswer: string;
+    });
+    row.studentAnswer = rescued.studentAnswer;
+    row.questionText =
+      row.questionText ||
+      (rescued as { questionText?: string }).questionText ||
+      "";
+  }
+
+  logger?.({
+    stage: "missing.rescue.done",
+    message: "Missing-answer rescue completed.",
+    meta: {
+      providerName: runtime.provider.name,
+      extractedCount: finalResults.filter((item) => item.studentAnswer.trim()).length,
+    },
+  });
+
+  return finalResults;
+}
+
 export async function extractStudentAnswersInBatches(params: {
   file: File;
-  questions: Array<{ id: number; label?: string; text?: string }>;
+  questions: Array<{ id: number; label?: string; text?: string; examContext?: StudentExamContext }>;
   providers: StudentProviderRuntime[];
   logger?: StudentExtractionLogger;
 }) {
   const { file, questions, providers, logger } = params;
   let lastError: unknown = null;
+
   const rescueEnabled =
-    String(process.env.STUDENT_MISSING_RESCUE_ENABLED || "").trim() !== "false";
+    String(process.env.STUDENT_MISSING_RESCUE_ENABLED || "").trim().toLowerCase() !== "false";
+  const configuredRescueLimit = Number(process.env.STUDENT_MISSING_RESCUE_LIMIT);
   const rescueLimit = Math.max(
     0,
-    Math.min(20, Number(process.env.STUDENT_MISSING_RESCUE_LIMIT) || 8)
+    Math.min(
+      50,
+      Number.isFinite(configuredRescueLimit) && configuredRescueLimit > 0
+        ? configuredRescueLimit
+        : 8
+    )
   );
+
+  // One shared budget for the whole request so a single paper can never burn
+  // through the daily free-tier quota across strict/lenient/rescue stages.
+  const budget = createStudentRequestBudget();
+  const countAnswers = (rows: Array<{ studentAnswer: string }>): number =>
+    rows.filter((r) => String(r.studentAnswer || "").trim()).length;
 
   for (const runtime of providers) {
     try {
@@ -828,202 +1579,350 @@ export async function extractStudentAnswersInBatches(params: {
         providerName: runtime.provider.name,
         logger,
       });
-      const batches = splitIntoBatches(questions, STUDENT_BATCH_SIZE);
       const resultsMap = new Map<
         number,
         { questionNumber: number; questionText: string; studentAnswer: string }
       >();
 
-      logger?.({
-        stage: "batch.plan",
-        message: "Student answer extraction batches prepared.",
-        meta: {
-          providerName: runtime.provider.name,
-          modelCount: runtime.models.length,
-          batchCount: batches.length,
-          questionCount: questions.length,
-          concurrency: STUDENT_BATCH_CONCURRENCY,
-        },
-      });
-
-      const batchOutputs = await mapWithConcurrency(
-        batches,
-        STUDENT_BATCH_CONCURRENCY,
-        async (batch, batchIndex) => {
-        const batchNumber = batchIndex + 1;
-        const batchStart = Date.now();
+      // ── Large multi-page files → scan in smaller file-part batches ──────
+      if (shouldUseFilePartBatches(fileParts)) {
         logger?.({
-          stage: "batch.start",
-          message: "Starting student extraction batch.",
+          stage: "file-batch.first",
+          message: "Large student file detected; scanning in smaller file-part batches.",
           meta: {
             providerName: runtime.provider.name,
-            batchNumber,
-            batchCount: batches.length,
-            questionNumbers: batch.map((q) => q.id),
+            modelCount: runtime.models.length,
+            questionCount: questions.length,
+            filePartsCount: fileParts.length,
+            budgetLimit: budget.limit,
           },
         });
 
-        let batchSucceeded = false;
-        let batchError: unknown = null;
+        let bestResults:
+          | Array<{ questionNumber: number; questionText: string; studentAnswer: string }>
+          | null = null;
 
         for (const modelName of runtime.models) {
+          if (!budget.canSpend()) break;
+          const fileBatchStart = Date.now();
           try {
-            const prompt = buildBatchPrompt(batch);
-            const raw = await generateParsedModelOutput({
-              provider: runtime.provider,
+            let finalResults = await extractStudentAnswersAcrossFilePartBatches({
+              runtime,
               modelName,
-              prompt,
+              questions,
               fileParts,
               logger,
+              mode: "strict",
+              budget,
             });
-            const normalized = normalizeStudentBatchPayload(raw, batch);
 
+            if (countAnswers(finalResults) === 0 && budget.canSpend()) {
+              logger?.({
+                stage: "file-batch.lenient.start",
+                level: "warn",
+                message:
+                  "Strict file-part extraction found no answers; trying lenient recovery.",
+                meta: {
+                  providerName: runtime.provider.name,
+                  modelName,
+                  questionCount: questions.length,
+                },
+              });
+              finalResults = await extractStudentAnswersAcrossFilePartBatches({
+                runtime,
+                modelName,
+                questions,
+                fileParts,
+                logger,
+                mode: "lenient",
+                budget,
+              });
+            }
+
+            const extractedCount = countAnswers(finalResults);
             logger?.({
-              stage: "batch.model.done",
-              message: "Batch extraction succeeded.",
-              durationMs: Date.now() - batchStart,
+              stage: "file-batch.all.done",
+              message: "Student extraction from file-part batches completed.",
+              durationMs: Date.now() - fileBatchStart,
               meta: {
                 providerName: runtime.provider.name,
                 modelName,
-                batchNumber,
-                extractedCount: normalized.length,
+                questionCount: finalResults.length,
+                extractedCount,
               },
             });
-            batchSucceeded = true;
-            return normalized;
+
+            bestResults = finalResults;
+            if (extractedCount > 0) return finalResults;
           } catch (error) {
-            batchError = error;
             lastError = error;
+            if (error instanceof StudentBudgetExhaustedError) break;
+            const isRateLimited = isRateLimitOrQuotaRootCause(error);
+            const isDailyQuota = isDailyQuotaRootCause(error);
             logger?.({
-              stage: "batch.model.failed",
+              stage: "file-batch.failed",
               level: "warn",
-              message: "Batch extraction attempt failed.",
+              message: isDailyQuota
+                ? `Model ${modelName} hit its daily free-tier quota during file-part extraction; trying next model.`
+                : isRateLimited
+                  ? `Model ${modelName} was rate limited during file-part extraction; trying next model.`
+                  : "File-part student extraction failed for this model.",
+              durationMs: Date.now() - fileBatchStart,
               meta: {
                 providerName: runtime.provider.name,
                 modelName,
-                batchNumber,
                 error: error instanceof Error ? error.message : String(error),
+                isRateLimited,
+                isDailyQuota,
+                retryAfterSeconds: getRateLimitRetryAfterSeconds(error),
               },
             });
           }
         }
 
-        if (!batchSucceeded) {
-          throw createStudentFailure({
-            fallbackMessage: `Failed to extract batch ${batchNumber}/${batches.length} from the configured AI provider.`,
-            statusCode: 502,
-            code: "BATCH_EXTRACTION_FAILED",
-            details: {
-              providerName: runtime.provider.name,
-              batchNumber,
-              batchCount: batches.length,
-            },
-            cause: batchError,
+        if (bestResults && countAnswers(bestResults) > 0) return bestResults;
+        if (bestResults) {
+          // A model succeeded but found nothing → genuine "no visible answers".
+          throw new StudentExtractionError(
+            "لم يتم العثور على إجابات طالب واضحة في الملف المرفوع. تأكد أن الملف يحتوي على إجابات الطالب وليس ورقة الأسئلة فقط، أو ارفع نسخة أوضح.",
+            422,
+            "NO_STUDENT_ANSWERS",
+            { questionCount: questions.length }
+          );
+        }
+        // No model call succeeded → surface the real failure (e.g. quota).
+        throw createStudentFailure({
+          fallbackMessage:
+            "Student extraction failed while scanning the uploaded file in smaller batches.",
+          statusCode: 502,
+          code: "FILE_PART_EXTRACTION_FAILED",
+          details: {
+            providerName: runtime.provider.name,
+            questionCount: questions.length,
+            filePartsCount: fileParts.length,
+          },
+          cause: lastError,
+        });
+      }
+
+      // ── Common case: single image / few pages → one full-paper pass per model ──
+      logger?.({
+        stage: "single-pass.start",
+        message: "Starting full-paper student extraction.",
+        meta: {
+          providerName: runtime.provider.name,
+          modelCount: runtime.models.length,
+          questionCount: questions.length,
+          filePartsCount: fileParts.length,
+          budgetLimit: budget.limit,
+        },
+      });
+
+      let foundAny = false;
+      let anySucceeded = false;
+      for (const modelName of runtime.models) {
+        if (!budget.canSpend()) break;
+        const passStart = Date.now();
+        try {
+          const raw = await generateParsedModelOutput({
+            provider: runtime.provider,
+            modelName,
+            prompt: buildBatchPrompt(questions),
+            fileParts,
+            logger,
+            budget,
           });
-        }
+          const normalized = normalizeStudentBatchPayload(raw, questions);
+          anySucceeded = true;
+          for (const item of normalized) {
+            mergeStudentAnswer(resultsMap, item);
+          }
+          const extractedCount = countAnswers([...resultsMap.values()]);
 
-        return [];
-        }
-      );
+          logger?.({
+            stage: "single-pass.done",
+            message: "Full-paper student extraction completed.",
+            durationMs: Date.now() - passStart,
+            meta: {
+              providerName: runtime.provider.name,
+              modelName,
+              questionCount: questions.length,
+              extractedCount,
+            },
+          });
 
-      for (const normalized of batchOutputs) {
-        for (const item of normalized) {
-          mergeStudentAnswer(resultsMap, item);
+          if (extractedCount === 0) {
+            // Diagnostic: surface exactly what the model returned so a genuinely
+            // empty paper can be told apart from a format/normalization drop.
+            logger?.({
+              stage: "single-pass.empty.raw",
+              level: "warn",
+              message:
+                "Model responded but no usable answers were parsed; logging raw payload for diagnosis.",
+              meta: {
+                providerName: runtime.provider.name,
+                modelName,
+                parsedItemCount: normalized.length,
+                rawPreview: safeStringifyPreview(raw),
+              },
+            });
+            continue;
+          }
+
+          logStudentQuestionRows({
+            logger,
+            stage: "single-pass.question",
+            rows: buildFinalStudentResults(questions, resultsMap),
+            meta: { providerName: runtime.provider.name, modelName },
+          });
+          foundAny = true;
+          break;
+        } catch (error) {
+          lastError = error;
+          if (error instanceof StudentBudgetExhaustedError) break;
+          const isRateLimited = isRateLimitOrQuotaRootCause(error);
+          const isDailyQuota = isDailyQuotaRootCause(error);
+          logger?.({
+            stage: "single-pass.failed",
+            level: "warn",
+            message: isDailyQuota
+              ? `Model ${modelName} hit its daily free-tier quota; trying next model.`
+              : isRateLimited
+                ? `Model ${modelName} was rate limited; trying next model.`
+                : "Full-paper extraction failed for this model; trying next model.",
+            durationMs: Date.now() - passStart,
+            meta: {
+              providerName: runtime.provider.name,
+              modelName,
+              error: error instanceof Error ? error.message : String(error),
+              isRateLimited,
+              isDailyQuota,
+              retryAfterSeconds: getRateLimitRetryAfterSeconds(error),
+            },
+          });
         }
       }
 
-      const finalResults = questions.map((q) => {
-        const found = resultsMap.get(q.id);
-        return (
-          found ?? {
-            questionNumber: q.id,
-            questionText: q.text || "",
-            studentAnswer: "",
+      // ── Recovery: a single lenient pass (first model) when nothing was found ──
+      if (!foundAny && budget.canSpend()) {
+        const modelName = runtime.models[0];
+        logger?.({
+          stage: "single-pass.lenient.start",
+          level: "warn",
+          message: "No strict answers found; trying one lenient recovery pass.",
+          meta: {
+            providerName: runtime.provider.name,
+            modelName,
+            questionCount: questions.length,
+          },
+        });
+        try {
+          const lenientRaw = await generateParsedModelOutput({
+            provider: runtime.provider,
+            modelName,
+            prompt: buildLenientBatchPrompt(questions),
+            fileParts,
+            logger,
+            budget,
+          });
+          const lenientItems = normalizeStudentBatchPayload(lenientRaw, questions);
+          anySucceeded = true;
+          for (const item of lenientItems) {
+            mergeStudentAnswer(resultsMap, item);
           }
-        );
-      });
-
-      if (rescueEnabled && rescueLimit > 0) {
-        const missing = finalResults
-          .filter((row) => !String(row.studentAnswer || "").trim())
-          .slice(0, rescueLimit);
-
-        if (missing.length) {
+          const extractedCount = countAnswers([...resultsMap.values()]);
           logger?.({
-            stage: "missing.rescue.start",
-            message: "Rescuing missing handwritten answers using per-question extraction.",
+            stage: "single-pass.lenient.done",
+            message: "Lenient visible-answer recovery completed.",
             meta: {
               providerName: runtime.provider.name,
-              missingCount: missing.length,
-              rescueLimit,
+              modelName,
+              questionCount: questions.length,
+              extractedCount,
             },
           });
-
-          const rescuedRows = await mapWithConcurrency(
-            missing,
-            STUDENT_RESCUE_CONCURRENCY,
-            async (row) => {
-            const q = questions.find((qq) => qq.id === row.questionNumber);
-            const prompt = buildSingleQuestionPrompt({
-              questionNumber: row.questionNumber,
-              questionText: q?.text || row.questionText || "",
-              questionLabel: q?.label,
+          if (extractedCount > 0) {
+            foundAny = true;
+          } else {
+            logger?.({
+              stage: "single-pass.lenient.empty.raw",
+              level: "warn",
+              message:
+                "Lenient pass also returned no usable answers; logging raw payload for diagnosis.",
+              meta: {
+                providerName: runtime.provider.name,
+                modelName,
+                parsedItemCount: lenientItems.length,
+                rawPreview: safeStringifyPreview(lenientRaw),
+              },
             });
-
-            let rescued: { questionNumber: number; questionText: string; studentAnswer: string } | null =
-              null;
-            for (const modelName of runtime.models) {
-              try {
-                const raw = await generateParsedModelOutput({
-                  provider: runtime.provider,
-                  modelName,
-                  prompt,
-                  fileParts,
-                  logger,
-                });
-                const normalized = normalizeSingleStudentPayload(
-                  raw,
-                  row.questionNumber
-                );
-                if (normalized.studentAnswer.trim()) {
-                  rescued = normalized;
-                  break;
-                }
-              } catch (e) {
-                lastError = e;
-                continue;
-              }
-            }
-
-            return { row, rescued };
-            }
-          );
-
-          for (const { row, rescued } of rescuedRows) {
-            if (!rescued?.studentAnswer?.trim()) continue;
-            mergeStudentAnswer(resultsMap, rescued);
-            row.studentAnswer = rescued.studentAnswer;
-            row.questionText = row.questionText || rescued.questionText;
           }
-
+        } catch (error) {
+          lastError = error;
           logger?.({
-            stage: "missing.rescue.done",
-            message: "Missing-answer rescue completed.",
+            stage: "single-pass.lenient.failed",
+            level: "warn",
+            message: "Lenient recovery pass failed.",
             meta: {
               providerName: runtime.provider.name,
-              extractedCount: finalResults.filter((item) => item.studentAnswer.trim()).length,
+              modelName,
+              error: error instanceof Error ? error.message : String(error),
             },
           });
         }
+      }
+
+      let finalResults = buildFinalStudentResults(questions, resultsMap);
+
+      // Rescue missing answers only when the paper clearly contains *some*
+      // answers (partial). Re-scanning an apparently blank paper wastes quota.
+      if (foundAny && rescueEnabled && rescueLimit > 0 && budget.canSpend()) {
+        finalResults = await rescueMissingStudentAnswers({
+          runtime,
+          questions,
+          finalResults,
+          resultsMap,
+          fileParts,
+          logger,
+          budget,
+          rescueLimit,
+        });
+      }
+
+      const finalExtractedCount = countAnswers(finalResults);
+      logStudentQuestionRows({
+        logger,
+        stage: "batch.final-question",
+        rows: finalResults,
+        meta: {
+          providerName: runtime.provider.name,
+          extractedCount: finalExtractedCount,
+        },
+      });
+
+      if (finalExtractedCount === 0) {
+        // If every model call failed (e.g. quota/rate limit), surface that real
+        // error instead of a misleading "no answers" message.
+        if (!anySucceeded && lastError) {
+          throw lastError instanceof Error
+            ? lastError
+            : new Error(String(lastError));
+        }
+        throw new StudentExtractionError(
+          "لم يتم العثور على إجابات طالب واضحة في الملف المرفوع. تأكد أن الملف يحتوي على إجابات الطالب وليس ورقة الأسئلة فقط، أو ارفع نسخة أوضح.",
+          422,
+          "NO_STUDENT_ANSWERS",
+          { questionCount: questions.length }
+        );
       }
 
       logger?.({
         stage: "batch.normalize.done",
-        message: "Batch extraction normalized successfully.",
+        message: "Student extraction normalized successfully.",
         meta: {
           providerName: runtime.provider.name,
           questionCount: finalResults.length,
-          extractedCount: finalResults.filter((item) => item.studentAnswer.trim()).length,
+          extractedCount: finalExtractedCount,
         },
       });
 
@@ -1039,11 +1938,34 @@ export async function extractStudentAnswersInBatches(params: {
           error: error instanceof Error ? error.message : String(error),
         },
       });
+      // A clean "no answers visible" verdict must not trigger other providers
+      // (they share the same key/quota); surface it directly to the user.
+      if (
+        error instanceof StudentExtractionError &&
+        error.code === "NO_STUDENT_ANSWERS"
+      ) {
+        throw error;
+      }
     }
   }
 
   if (lastError instanceof StudentExtractionError) {
     throw lastError;
+  }
+
+  if (isRateLimitOrQuotaRootCause(lastError)) {
+    throw createStudentFailure({
+      fallbackMessage:
+        "تم استنفاذ حد الاستخدام لجميع نماذج Gemini المُهيَّأة. أضف نماذج بديلة في AI_MODELS أو ارفع خطة المفتاح ثم أعد المحاولة.",
+      statusCode: 429,
+      code: isDailyQuotaRootCause(lastError)
+        ? "DAILY_QUOTA_EXHAUSTED"
+        : "RATE_LIMITED",
+      details: {
+        retryAfterSeconds: getRateLimitRetryAfterSeconds(lastError),
+      },
+      cause: lastError,
+    });
   }
 
   throw createStudentFailure({

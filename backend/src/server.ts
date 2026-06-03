@@ -1,17 +1,14 @@
-/** Node HTTP entry — AI + Prisma REST API for the Next.js BFF. */
+/** Node HTTP entry for the Next.js BFF backend API. */
 import fs from "node:fs";
 import path from "node:path";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app";
 
 function loadDotEnvIfNeeded() {
-  // Always load ALL .env candidates — the dev runner (preview tool) may
-  // pre-inject only a few vars (e.g. DATABASE_URL, INTERNAL_API_SECRET)
-  // while AI keys are only present in backend/.env.
   const candidates = [
-    path.resolve(process.cwd(), "backend", ".env"), // workspace-root CWD → backend/.env
-    path.resolve(process.cwd(), ".env"),             // backend CWD → backend/.env
-    path.resolve(process.cwd(), "..", ".env"),       // fallback to parent .env
+    path.resolve(process.cwd(), "backend", ".env"),
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(process.cwd(), "..", ".env"),
   ];
   for (const p of candidates) {
     if (!fs.existsSync(p)) continue;
@@ -29,8 +26,6 @@ function loadDotEnvIfNeeded() {
       ) {
         value = value.slice(1, -1);
       }
-      // Use !process.env[key] (not !(key in process.env)) so that
-      // empty-string values pre-injected by the dev runner are overridden.
       if (!process.env[key]) process.env[key] = value;
     }
   }
@@ -38,20 +33,32 @@ function loadDotEnvIfNeeded() {
 
 loadDotEnvIfNeeded();
 
-// Startup diagnostics — shows which critical env vars are present (values hidden).
 const _diag = {
   DATABASE_URL: !!process.env.DATABASE_URL,
   INTERNAL_API_SECRET: !!process.env.INTERNAL_API_SECRET,
   AI_PROVIDER: process.env.AI_PROVIDER || "(not set)",
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY ? `set (${process.env.GEMINI_API_KEY.slice(0, 8)}…)` : "MISSING",
-  AI_API_KEY: process.env.AI_API_KEY ? `set (${process.env.AI_API_KEY.slice(0, 8)}…)` : "MISSING",
-  EXTRACTION_PROVIDER: process.env.EXTRACTION_PROVIDER || "(not set)",
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY
+    ? `set (${process.env.GEMINI_API_KEY.slice(0, 8)}...)`
+    : "MISSING",
+  AI_MODELS: process.env.AI_MODELS || "(not set)",
 };
 console.log("[server] ENV check:", JSON.stringify(_diag));
 
 const port = Number(process.env.PORT) || 4000;
 const app = createApp();
 
-serve({ fetch: app.fetch, port }, (info) => {
+const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(`Backend listening on http://localhost:${info.port}`);
+});
+
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(
+      `[server] Port ${port} is already in use. Stop the other "npm run dev" (or any process on :${port}), then restart once.\n` +
+        `  Windows: Get-NetTCPConnection -LocalPort ${port} -State Listen | Select OwningProcess\n` +
+        `  Then: taskkill /PID <pid> /F`
+    );
+    process.exit(1);
+  }
+  throw err;
 });

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import {
+  ArrowRight,
   UploadCloud,
   FileType,
   CheckCircle,
@@ -42,6 +43,8 @@ export function ExamUploadForm() {
   const [error, setError] = useState<string | null>(null);
   const [structureError, setStructureError] =
     useState<StructureValidation | null>(null);
+  const [structureOverride, setStructureOverride] = useState(false);
+  const [pendingQuestions, setPendingQuestions] = useState<any>(null);
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(
     null
   );
@@ -120,9 +123,6 @@ export function ExamUploadForm() {
       formData.append("expectedStructure", JSON.stringify(examStructure));
 
       const response = await axios.post("/api/services/extract-teacher", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
         timeout: 600000,
       });
 
@@ -136,11 +136,15 @@ export function ExamUploadForm() {
           examStructure,
           response.data.questions
         );
-        if (!validation.ok) {
+        if (!validation.ok && !structureOverride) {
           setStructureError(validation);
+          setPendingQuestions(response.data);
           return;
         }
 
+        setStructureError(null);
+        setStructureOverride(false);
+        setPendingQuestions(null);
         setExtractedQuestions(response.data.questions);
         if (response.data.title && typeof response.data.title === "string") {
           setExamDetails({ aiSuggestedTitle: response.data.title.trim() });
@@ -235,11 +239,12 @@ export function ExamUploadForm() {
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-xl font-medium text-sm"
+          className="h-11 gap-2 rounded-2xl border-brand-teal/30 bg-white px-4 text-sm font-black text-brand-teal-dark shadow-sm shadow-brand-teal/10 transition hover:border-brand-teal hover:bg-brand-teal-light hover:text-brand-teal-dark"
           onClick={() => setStep(1)}
           disabled={isExtracting}
         >
-          رجوع
+          <ArrowRight className="h-4 w-4" />
+          العودة للبيانات الأساسية
         </Button>
       </div>
 
@@ -415,8 +420,8 @@ export function ExamUploadForm() {
               </h4>
             </div>
             <p className="mt-1.5 text-xs font-medium text-[#D32F2F]/90 dark:text-[#EF5350]/90">
-              لا يمكن المتابعة حتى يتطابق الاستخراج مع ما حددته. راجع ملف
-              الاختبار وأعد الاستخراج، أو ارجع وصحّح الهيكل في خطوة البيانات.
+              نتيجة الاستخراج لا تتطابق مع الهيكل المحدد. يمكنك تعديل الهيكل
+              وإعادة الاستخراج، أو المتابعة بالنتيجة الحالية.
             </p>
 
             <div className="mt-3 overflow-hidden rounded-xl border border-[#D32F2F]/20 bg-white dark:bg-[#1A2E2D]">
@@ -448,6 +453,26 @@ export function ExamUploadForm() {
                 </tbody>
               </table>
             </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 w-full border-[#D32F2F]/30 text-[#D32F2F] hover:bg-[#D32F2F]/10 dark:text-[#EF5350] dark:border-[#EF5350]/30 dark:hover:bg-[#EF5350]/10 font-bold text-xs"
+              onClick={() => {
+                if (pendingQuestions?.questions) {
+                  setExtractedQuestions(pendingQuestions.questions);
+                  if (pendingQuestions.title) {
+                    setExamDetails({ aiSuggestedTitle: pendingQuestions.title.trim() });
+                  }
+                  setStructureError(null);
+                  setStructureOverride(false);
+                  setPendingQuestions(null);
+                  setStep(3);
+                }
+              }}
+            >
+              متابعة بالنتيجة الحالية رغم الاختلاف
+            </Button>
           </motion.div>
         )}
 

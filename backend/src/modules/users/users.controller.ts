@@ -6,8 +6,8 @@ import { actingSubject } from "@/common/types";
 import { forbidden, jsonError } from "@/common/http";
 import { canAdminPanelAction } from "@/lib/admin-user-actions";
 import {
+  ALL_PERMISSION_KEYS,
   COMMITTEE_PERMISSION_KEYS,
-  PERMISSION_KEYS,
   sanitizeKeysForRole,
 } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -38,7 +38,7 @@ export async function getMe(c: Context) {
       department: user.department,
       jobTitle: user.jobTitle,
       phone: user.phone,
-      permissionKeys: user.permissionKeys ?? [],
+      permissionKeys: user.role === "ADMIN" ? [...ALL_PERMISSION_KEYS] : user.permissionKeys ?? [],
       profileLocked: user.profileLocked ?? true,
     });
   } catch {
@@ -202,7 +202,7 @@ export async function adminPatchUser(c: Context) {
       data.permissionKeys = [];
     } else if (Array.isArray(permissionKeys)) {
       let nextKeys = sanitizeKeysForRole(effectiveRole, permissionKeys);
-      if (effectiveRole === "ADMIN" && nextKeys.length === 0) nextKeys = [PERMISSION_KEYS.MANAGE_USERS];
+      if (effectiveRole === "ADMIN") nextKeys = [...ALL_PERMISSION_KEYS];
       if (effectiveRole === "COMMITTEE" && nextKeys.length === 0) nextKeys = [...COMMITTEE_PERMISSION_KEYS];
       data.permissionKeys = nextKeys;
     }

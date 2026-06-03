@@ -3,8 +3,8 @@ import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import {
+  ALL_PERMISSION_KEYS,
   COMMITTEE_PERMISSION_KEYS,
-  PERMISSION_KEYS,
   sanitizeKeysForRole,
 } from "@/lib/permissions";
 
@@ -98,7 +98,7 @@ export async function createUser(params: {
   const roleTyped = role as Role;
   const rawKeys = Array.isArray(permissionKeys) ? permissionKeys : [];
   let keys = sanitizeKeysForRole(roleTyped, rawKeys);
-  if (roleTyped === "ADMIN" && keys.length === 0) keys = [PERMISSION_KEYS.MANAGE_USERS];
+  if (roleTyped === "ADMIN") keys = [...ALL_PERMISSION_KEYS];
   if (roleTyped === "COMMITTEE" && keys.length === 0) keys = [...COMMITTEE_PERMISSION_KEYS];
 
   const user = await prisma.user.create({

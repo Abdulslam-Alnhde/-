@@ -49,11 +49,11 @@ const TEXT_PART_OVERLAP_CHARS = Math.max(
 );
 const PDF_RENDER_MAX_PAGES = Math.max(
   1,
-  Math.min(4, Number(process.env.PDF_RENDER_MAX_PAGES) || 2)
+  Math.min(30, Number(process.env.PDF_RENDER_MAX_PAGES) || 12)
 );
 const PDF_RENDER_MAX_EDGE = Math.max(
   1024,
-  Math.min(2400, Number(process.env.PDF_RENDER_MAX_EDGE) || 1600)
+  Math.min(3200, Number(process.env.PDF_RENDER_MAX_EDGE) || 2200)
 );
 
 const importRuntimeModule = new Function(
@@ -107,7 +107,12 @@ export function shouldUseExtractedPdfTextAsPrimarySource(params: {
   pdfText: string;
   preferTextOnlyForPdf?: boolean;
 }): boolean {
-  return params.preferTextOnlyForPdf === true;
+  // Image rendering is capped at a few pages, so multi-page PDFs lose content.
+  // When the PDF yields substantial machine-readable text, use it as the
+  // primary source — it covers every page and prevents the model from
+  // hallucinating questions it never saw.
+  if (params.preferTextOnlyForPdf === false) return false;
+  return params.pdfText.trim().length >= 200;
 }
 
 function splitLargeText(

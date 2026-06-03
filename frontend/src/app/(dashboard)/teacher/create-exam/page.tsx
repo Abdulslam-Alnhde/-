@@ -33,12 +33,12 @@ function CreateExamWizardInner() {
       />
 
       {/* STEPS HEADER */}
-      <div className="w-full max-w-2xl mx-auto mb-12">
-        <div className="relative flex items-center justify-between">
+      <div className="mx-auto mb-14 w-full max-w-4xl px-4">
+        <div className="relative z-0 flex items-center justify-between">
           {/* Progress track */}
-          <div className="absolute left-0 top-[22px] -translate-y-1/2 w-full h-1 bg-border rounded-full pointer-events-none -z-10" />
+          <div className="pointer-events-none absolute left-0 top-8 z-0 h-2 w-full -translate-y-1/2 rounded-full bg-brand-teal-light ring-1 ring-brand-teal/10" />
           <div
-            className="absolute left-0 top-[22px] -translate-y-1/2 h-1 bg-primary rounded-full pointer-events-none -z-10 transition-all duration-500"
+            className="pointer-events-none absolute left-0 top-8 z-0 h-2 -translate-y-1/2 rounded-full bg-brand-teal shadow-sm shadow-brand-teal/20 transition-all duration-500"
             style={{ width: `${((step - 1) / (STEPS.length - 1)) * 100}%` }}
           />
           
@@ -50,7 +50,7 @@ function CreateExamWizardInner() {
             return (
               <div 
                 key={s.num}
-                className="flex flex-col items-center gap-3 relative z-10"
+                className="relative z-10 flex min-w-[160px] flex-col items-center gap-4"
               >
                 <button
                   type="button"
@@ -58,23 +58,27 @@ function CreateExamWizardInner() {
                     if (canGoBack) setStep(s.num);
                   }}
                   disabled={!canGoBack}
-                  className={`w-10 h-10 flex items-center justify-center rounded-xl border-2 transition-all duration-300 font-medium ${
+                  className={`flex h-16 w-16 items-center justify-center rounded-2xl border-2 text-lg font-black transition-all duration-300 ${
                     isCompleted
-                      ? "bg-primary border-primary text-primary-foreground shadow-md shadow-primary/25"
+                      ? "border-brand-teal bg-brand-teal text-white shadow-lg shadow-brand-teal/25"
                       : isCurrent
-                        ? "bg-white border-primary text-primary shadow-lg shadow-primary/15 ring-4 ring-primary/10 dark:bg-card"
-                        : "bg-white border-border text-muted-foreground dark:bg-card"
+                        ? "border-brand-teal bg-white text-brand-teal shadow-lg shadow-brand-teal/20 ring-4 ring-brand-teal/15 dark:bg-card"
+                        : "border-brand-teal/15 bg-white text-muted-foreground/70 shadow-sm dark:bg-card"
                   } ${canGoBack ? "cursor-pointer hover:scale-105" : "cursor-default"}`}
                 >
-                  {isCompleted ? <Check className="w-5 h-5" strokeWidth={2.5} /> : <s.icon className="w-5 h-5" />}
+                  {isCompleted ? (
+                    <Check className="h-7 w-7" strokeWidth={2.75} />
+                  ) : (
+                    <s.icon className="h-7 w-7" strokeWidth={2.4} />
+                  )}
                 </button>
                 <span 
-                  className={`text-xs whitespace-nowrap font-medium transition-colors duration-300 ${
+                  className={`whitespace-nowrap text-[15px] font-black transition-colors duration-300 ${
                     isCurrent 
-                      ? "text-primary" 
+                      ? "text-brand-teal-dark" 
                       : isCompleted 
                         ? "text-foreground" 
-                        : "text-muted-foreground opacity-50"
+                        : "text-muted-foreground/75"
                   }`}
                 >
                   {s.title}

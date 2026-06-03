@@ -35,16 +35,6 @@ const SERVICE = "teacherExtraction" as const;
 
 // ─── Tunables ──────────────────────────────────────────────────────────
 
-const CUSTOM_PROVIDER_MAX_PDF_PAGES = Math.max(
-  1,
-  Math.min(12, Number(process.env.CUSTOM_PROVIDER_MAX_PDF_PAGES) || 6)
-);
-
-const CUSTOM_PROVIDER_MAX_TOKENS = Math.max(
-  1536,
-  Math.min(8192, Number(process.env.CUSTOM_PROVIDER_MAX_TOKENS) || 4096)
-);
-
 const TEACHER_EXTRACT_MAX_TOKENS = 12288;
 
 // ─── Fast PDF heuristics ───────────────────────────────────────────────
@@ -687,7 +677,7 @@ async function repairExtractResponseJson(params: {
     {
       model: modelName,
       temperature: 0,
-      maxTokens: Math.min(3072, CUSTOM_PROVIDER_MAX_TOKENS),
+      maxTokens: 3072,
       responseMimeType: "application/json",
     }
   );
@@ -874,11 +864,8 @@ async function fillMissingModelAnswers(params: {
         prepareFileForAI(file, {
           providerName: provider.name,
           roleLabel: "Reference file",
-          maxPdfPages:
-            provider.name === "custom"
-              ? CUSTOM_PROVIDER_MAX_PDF_PAGES
-              : undefined,
-          preferTextOnlyForPdf: false,
+          maxPdfPages: undefined,
+          preferTextOnlyForPdf: true,
         })
       )
   );
@@ -1103,11 +1090,8 @@ export async function runTeacherExtraction(req: Request): Promise<Response> {
         const parts = await prepareFileForAI(examFile, {
           providerName: provider.name,
           roleLabel: "Exam file",
-          maxPdfPages:
-            provider.name === "custom"
-              ? CUSTOM_PROVIDER_MAX_PDF_PAGES
-              : undefined,
-          preferTextOnlyForPdf: false,
+          maxPdfPages: undefined,
+          preferTextOnlyForPdf: true,
         });
         return { examFile, parts };
       })

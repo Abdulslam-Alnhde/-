@@ -1,6 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/common/lib/prisma";
+import { ALL_PERMISSION_KEYS } from "@/common/lib/permissions";
 import { verifyPassword } from "@/modules/auth/lib/password";
 
 export const authOptions: NextAuthOptions = {
@@ -12,52 +13,35 @@ export const authOptions: NextAuthOptions = {
         password: { label: "كلمة المرور", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email) return null;
+        if (!credentials?.email || !credentials?.password) return null;
 
         const email = credentials.email.trim().toLowerCase();
-        
-        // ------------- وضع الطوارئ: الدخول الفوري بدون باسوورد -------------
-        // إذا كان الإيميل هو إيميل المشرف، سيدخل فوراً بكامل الصلاحيات!
-        if (email === "admin@university.edu" || email === "1001") {
-          return {
-            id: "admin-1001",
-            email: "admin@university.edu",
-            name: "مشرف النظام",
-            role: "ADMIN",
-            permissionKeys: ["MANAGE_USERS", "SETTINGS"],
-          };
-        }
-        // ---------------------------------------------------------------
-
-        console.log("==== START NORMAL LOGIN ATTEMPT ====");
-        console.log("Email provided:", email);
-        if (!credentials?.password) return null;
 
         try {
-          console.log("Querying database for user...");
-          const user = await prisma.user.findUnique({ where: { email } });
-          console.log("User query result:", user ? `FOUND (id: ${user.id})` : "NOT FOUND");
-          
-          if (!user?.passwordHash) {
-            console.log("Login failed: No password hash for user.");
-            return null;
-          }
+          const user = await prisma.user.findUnique({
+            where: { email },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true,
+              passwordHash: true,
+              permissionKeys: true,
+            },
+          });
+          if (!user?.passwordHash) return null;
 
-          console.log("Verifying password...");
           const ok = await verifyPassword(credentials.password, user.passwordHash);
-          console.log("Password verification result:", ok);
-          
           if (!ok) return null;
-          
-          console.log("==== LOGIN SUCCESS ====");
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          permissionKeys: user.permissionKeys ?? [],
-        };
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            permissionKeys:
+              user.role === "ADMIN" ? [...ALL_PERMISSION_KEYS] : user.permissionKeys ?? [],
+          };
         } catch (error) {
           console.error("AUTH ERROR CAUGHT:", error);
           return null;
@@ -70,7 +54,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
-        token.permissionKeys = user.permissionKeys ?? [];
+        token.permissionKeys =
+          user.role === "ADMIN" ? [...ALL_PERMISSION_KEYS] : user.permissionKeys ?? [];
       }
       return token;
     },
@@ -78,7 +63,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role;
-        session.user.permissionKeys = (token.permissionKeys as string[]) ?? [];
+        session.user.permissionKeys =
+          token.role === "ADMIN" ? [...ALL_PERMISSION_KEYS] : (token.permissionKeys as string[]) ?? [];
       }
       return session;
     },
